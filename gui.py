@@ -172,114 +172,112 @@ def days_since(dt_object, default="N/A"):
     if diff_days == 1: return "1 day old"
     return f"{diff_days} days old"
 
+
 def load_and_process_tickets():
-    """Loads tickets from JSON files, processes them, and categorizes them."""
-    global AGENT_MAPPING, REQUESTER_MAPPING # Ensure global mappings are accessible
+    global OPEN_TICKET_STATUS_ID, WAITING_ON_CUSTOMER_STATUS_ID, WAITING_ON_AGENT
+    global FR_SLA_CRITICAL_HOURS, FR_SLA_WARNING_HOURS
+    global AGENT_MAPPING, REQUESTER_MAPPING
+
     list_status_open_tickets = []
     list_waiting_on_agent = []
-    list_section3_candidates = []
+    list_section3_candidates = [] # This will now hold all other tickets
 
     if not os.path.isdir(TICKETS_DIR):
         app.logger.error(f"Tickets directory '{TICKETS_DIR}' not found.")
         return [], [], []
 
     for filename in os.listdir(TICKETS_DIR):
-        if filename.endswith(".txt") and filename[:-4].isdigit(): # Basic check for ticket files
+        if filename.endswith(".txt") and filename[:-4].isdigit():
             file_path = os.path.join(TICKETS_DIR, filename)
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
 
                 ticket = {
-                    'id': data.get('id', int(filename[:-4])), # Fallback to filename for ID
-                    'subject': data.get('subject', 'No Subject Provided'),
+                    'id': data.get('id', int(filename[:-4])),
+                    'subject': data.get('subject', 'No Subject'),
                     'requester_id': data.get('requester_id'),
-                    'responder_id': data.get('responder_id'), # Agent ID
+                    'responder_id': data.get('responder_id'),
                     'status_raw': data.get('status'),
                     'priority_raw': data.get('priority'),
                     'description_text': data.get('description_text', ''),
                     'fr_due_by_str': data.get('fr_due_by'),
                     'updated_at_str': data.get('updated_at'),
                     'created_at_str': data.get('created_at'),
-                    'type': data.get('type', 'N/A'), # Ticket type (Incident, Service Request)
-                    'stats': data.get('stats', {}) # Contains responder_id, first_responded_at etc.
+                    'type': data.get('type', 'N/A'),
+                    'stats': data.get('stats', {})
                 }
 
-                # Agent Name Mapping
                 agent_id_from_ticket = ticket.get('responder_id')
-                ticket['agent_name'] = AGENT_MAPPING.get(agent_id_from_ticket, f"Agent ID: {agent_id_from_ticket}") if agent_id_from_ticket else 'Unassigned'
+                if agent_id_from_ticket is not None:
+                    ticket['agent_name'] = AGENT_MAPPING.get(agent_id_from_ticket, f"Agent ID: {agent_id_from_ticket}")
+                else:
+                    ticket['agent_name'] = 'Unassigned'
 
-                # Requester Name Mapping
                 requester_id_from_ticket = ticket.get('requester_id')
-                ticket['requester_name'] = REQUESTER_MAPPING.get(requester_id_from_ticket, f"Req. ID: {requester_id_from_ticket}") if requester_id_from_ticket else 'N/A'
+                if requester_id_from_ticket is not None:
+                    ticket['requester_name'] = REQUESTER_MAPPING.get(requester_id_from_ticket, f"Req. ID: {requester_id_from_ticket}")
+                else:
+                    ticket['requester_name'] = 'N/A'
 
-                # Datetime parsing
                 ticket['fr_due_by_dt'] = parse_datetime_utc(ticket['fr_due_by_str'])
                 ticket['updated_at_dt'] = parse_datetime_utc(ticket['updated_at_str'])
                 ticket['created_at_dt'] = parse_datetime_utc(ticket['created_at_str'])
                 ticket['first_responded_at_dt'] = parse_datetime_utc(ticket['stats'].get('first_responded_at'))
                 ticket['agent_responded_at_dt'] = parse_datetime_utc(ticket['stats'].get('agent_responded_at'))
-                ticket['status_updated_at_dt'] = parse_datetime_utc(ticket['stats'].get('status_updated_at')) # When status last changed
+                ticket['status_updated_at_dt'] = parse_datetime_utc(ticket['stats'].get('status_updated_at'))
 
-                # Friendly text
+                ticket['status_text'] = get_status_text(ticket['status_raw'])
                 ticket['priority_text'] = get_priority_text(ticket['priority_raw'])
                 ticket['updated_friendly'] = time_since(ticket['updated_at_dt'])
-                ticket['created_days_old'] = days_since(ticket['created_at_dt']) # NEW
+                ticket['created_friendly'] = time_since(ticket['created_at_dt'])
                 ticket['agent_responded_friendly'] = time_since(ticket['agent_responded_at_dt'])
-
                 ticket_updated_timestamp = ticket['updated_at_dt'].timestamp() if ticket['updated_at_dt'] else 0.0
 
-                # Default SLA text and class, will be overridden by categorization logic
-                ticket['sla_text'] = get_status_text(ticket['status_raw']) # Fallback text
-                ticket['sla_class'] = "sla-none" # Fallback class
+                # Set default sla_text and sla_class. These will be used by tickets in list_section3_candidates
+                # unless a more specific rule below (like for Waiting on Customer) overrides them.
+                ticket['sla_text'] = f"{ticket['status_text']} ({ticket['updated_friendly']})"
+                ticket['sla_class'] = "sla-in-progress" # Default class
 
-                # Categorization Logic
-                if ticket['status_raw'] == OPEN_TICKET_STATUS_ID:
-                    if ticket['first_responded_at_dt'] is None: # Needs first response
+                # Categorization logic:
+                if ticket['status_raw'] == OPEN_TICKET_STATUS_ID: # Status 2
+                    if ticket['first_responded_at_dt'] is None: # Needs First Response
                         sla_text, sla_class, fr_sla_sort_key = get_fr_sla_details_for_open_ticket(
                             ticket['fr_due_by_dt'], FR_SLA_CRITICAL_HOURS, FR_SLA_WARNING_HOURS)
                         ticket['sla_text'], ticket['sla_class'] = sla_text, sla_class
-                        # Sort by: 1. Needs FR (0), 2. FR SLA time (sooner is higher), 3. Newest update
+                        # Sort by: 0 (needs FR), FR SLA sort key, then by latest update (desc)
                         ticket['action_sort_key_tuple'] = (0, fr_sla_sort_key, -ticket_updated_timestamp)
-                    else: # Open, but already responded to at least once (agent needs to act)
+                    else: # Open, but already had a first response
                         ticket['sla_text'] = f"Open ({ticket['updated_friendly']})"
-                        ticket['sla_class'] = "sla-in-progress" # Or a specific class for "Open, Agent to Act"
-                        # Sort by: 1. Responded (1), 2. Newest update
+                        # sla_class remains "sla-in-progress" or you can change it if needed
+                        # Sort by: 1 (FR met/not applicable), then by latest update (desc)
                         ticket['action_sort_key_tuple'] = (1, -ticket_updated_timestamp, 0)
                     list_status_open_tickets.append(ticket)
 
-                elif ticket['status_raw'] == WAITING_ON_AGENT:
-                    ticket['sla_text'] = f"Customer Replied: {ticket['updated_friendly']}"
-                    ticket['sla_class'] = "sla-warning" # Highlight that agent needs to reply
-                    ticket['action_sort_key'] = ticket_updated_timestamp # Sort by oldest update first
+                elif ticket['status_raw'] == WAITING_ON_AGENT: # Status 26
+                    ticket['sla_text'] = f"Waiting on Agent ({ticket['updated_friendly']})"
+                    ticket['sla_class'] = "sla-warning"
+                    ticket['action_sort_key'] = ticket_updated_timestamp # Sort by oldest update first (ascending timestamp)
                     list_waiting_on_agent.append(ticket)
 
-                # Condition for "Review Needed" in Section 3
-                # (Ticket updated by customer after agent's last response, and not in other primary categories)
-                elif ticket['updated_at_dt'] and ticket['agent_responded_at_dt'] and \
-                     ticket['updated_at_dt'] > ticket['agent_responded_at_dt'] and \
-                     ticket['updated_at_dt'] != ticket['status_updated_at_dt'] and \
-                     ticket['status_raw'] not in [OPEN_TICKET_STATUS_ID, WAITING_ON_AGENT, WAITING_ON_CUSTOMER_STATUS_ID]:
-                    ticket['sla_text'] = f"Review Needed ({ticket['updated_friendly']})"
-                    ticket['sla_class'] = "sla-critical" # Highlight for review
-                    ticket['action_sort_key'] = ticket_updated_timestamp
-                    list_section3_candidates.append(ticket)
-                else: # Other statuses for section 3
-                    if ticket['status_raw'] == WAITING_ON_CUSTOMER_STATUS_ID:
+                else:
+                    # All other tickets fall into this category (list_section3_candidates)
+                    # Specific handling for "Waiting on Customer"
+                    if ticket['status_raw'] == WAITING_ON_CUSTOMER_STATUS_ID: # Status 9
                         ticket['sla_text'] = "Waiting on Customer"
-                        if ticket['agent_responded_friendly'] != 'N/A': # Add when agent last replied
-                             ticket['sla_text'] += f" (Agent: {ticket['agent_responded_friendly']})"
-                        ticket['sla_class'] = "sla-responded" # Indicates agent has responded, now on customer
-                    else: # Fallback for other statuses like Pending, On Hold, etc.
-                        ticket['sla_text'] = f"{get_status_text(ticket['status_raw'])} ({ticket['updated_friendly']})"
-                        # Assign a generic class or derive one based on status
-                        # You can create specific SLA classes for these statuses if needed
-                        if ticket['status_raw'] in [PENDING_TICKET_STATUS_ID, 8, 10, 13, 23]: # Example statuses
-                            ticket['sla_class'] = "sla-in-progress" # Or sla-onhold, sla-pending etc.
-                        else:
-                            ticket['sla_class'] = "sla-none"
+                        if ticket['agent_responded_friendly'] != 'N/A':
+                            ticket['sla_text'] += f" (Agent: {ticket['agent_responded_friendly']})"
+                        ticket['sla_class'] = "sla-responded"
 
-                    ticket['action_sort_key'] = ticket_updated_timestamp # Sort by oldest update
+                    # Specific handling for "On Hold"
+                    elif ticket['status_raw'] == 23: # Status 23 ("On Hold")
+                        ticket['sla_text'] = f"On Hold ({ticket['updated_friendly']})"
+                        ticket['sla_class'] = "sla-on-hold" # You can define .sla-on-hold in your CSS
+
+                    # For any other statuses (e.g., Pending, Scheduled, custom statuses)
+                    # they will use the default 'sla_text' and 'sla_class' set earlier.
+
+                    ticket['action_sort_key'] = ticket_updated_timestamp # Sort by oldest update first (ascending timestamp)
                     list_section3_candidates.append(ticket)
 
             except json.JSONDecodeError:
@@ -287,10 +285,10 @@ def load_and_process_tickets():
             except Exception as e:
                 app.logger.error(f"Error processing {filename}: {e}", exc_info=True)
 
-    # Sort lists: Open tickets by their complex key, others by update time (oldest first for action)
+    # Sorting the lists
     list_status_open_tickets.sort(key=lambda t: t.get('action_sort_key_tuple', (2, float('inf'), 0)))
-    list_waiting_on_agent.sort(key=lambda t: t.get('action_sort_key', float('inf')))
-    list_section3_candidates.sort(key=lambda t: t.get('action_sort_key', float('inf')))
+    list_waiting_on_agent.sort(key=lambda t: t.get('action_sort_key', float('inf'))) # Older updated tickets first
+    list_section3_candidates.sort(key=lambda t: t.get('action_sort_key', float('inf'))) # Older updated tickets first
 
     return list_status_open_tickets, list_waiting_on_agent, list_section3_candidates
 
