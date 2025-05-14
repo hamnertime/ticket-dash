@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (dashboardTimeLocalEl) {
             // Initial load from Jinja if dashboard_generated_time_iso is passed to template
             // Or set to loading / N/A if not immediately available
-            const initialIsoTime = dashboardTimeLocalEl.getAttribute('data-initial-utc-time');
+            const initialIsoTime = dashboardTimeLocalEl.getAttribute('data-initial-utc-time'); // You might need to set this attribute in HTML if you want to use it
             if(initialIsoTime) {
                 dashboardTimeLocalEl.textContent = formatToLocal(initialIsoTime);
             }
@@ -94,8 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Get config from global window objects set in index.html
     const FRESHSERVICE_BASE_URL = window.FRESHSERVICE_BASE_URL || '';
     const AUTO_REFRESH_INTERVAL_MS = window.AUTO_REFRESH_MS || 0;
-    // const OPEN_TICKET_STATUS_ID_JS = window.OPEN_TICKET_STATUS_ID; // Available if needed
-    // const WAITING_ON_CUSTOMER_STATUS_ID_JS = window.WAITING_ON_CUSTOMER_STATUS_ID; // Available if needed
+    // const OPEN_TICKET_STATUS_ID_JS = window.OPEN_TICKET_STATUS_ID; // Available if needed via window object
+    // const WAITING_ON_CUSTOMER_STATUS_ID_JS = window.WAITING_ON_CUSTOMER_STATUS_ID; // Available if needed via window object
 
 
     function formatTicketSubjectForRender(subject, descriptionText) {
@@ -133,12 +133,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
         }
 
-        // Specific logic for Section 3's "Action / SLA" column if needed, but gui.py should prepare sla_text
-        // Example for section 3, if WAITING_ON_CUSTOMER and agent_responded_friendly needs to be shown:
-        // let additionalSlaDetail = '';
-        // if (ticket.status_raw === WAITING_ON_CUSTOMER_STATUS_ID_JS && ticket.agent_responded_friendly && ticket.agent_responded_friendly !== 'N/A') {
-        //    additionalSlaDetail = `<br><small>Agent: ${ticket.agent_responded_friendly}</small>`;
-        // } // This kind of logic is now mostly handled by Python side's sla_text generation.
+        // The commented-out logic for additionalSlaDetail has been removed
+        // as this is now handled by the Python side (gui.py preparing sla_text).
 
         return `
         <tr>
@@ -150,7 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
         <td class="col-action-sla">
         <span class="sla-status-text ${slaClass}">${slaText}</span>
         ${frDueHtml}
-        {# ${additionalSlaDetail} #}
         </td>
         <td>${updatedFriendly}</td>
         <td>${createdDaysOld}</td>
@@ -177,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tableBody.innerHTML += renderTicketRow(ticket);
             });
             noTicketsMessageElement.style.display = 'none';
-            tableElement.style.display = ''; // Show table (could be 'table' or 'block' depending on CSS default)
+            tableElement.style.display = ''; // Show table
         } else {
             noTicketsMessageElement.style.display = 'block';
             tableElement.style.display = 'none'; // Hide table
@@ -190,7 +185,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/tickets');
             if (!response.ok) {
                 console.error('Failed to fetch ticket data:', response.status, await response.text());
-                document.getElementById('dashboard-generated-time').textContent = "Error loading data!";
+                const dashboardTimeEl = document.getElementById('dashboard-generated-time');
+                if (dashboardTimeEl) dashboardTimeEl.textContent = "Error loading data!";
                 return;
             }
             const data = await response.json();
@@ -208,9 +204,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update dashboard generated time (using the new data from API)
             if(data.dashboard_generated_time_iso){
-                convertAllUTCToLocal(data.dashboard_generated_time_iso); // This will update the #dashboard-generated-time element
+                // Pass the ISO string to convertAllUTCToLocal which will update the relevant element
+                convertAllUTCToLocal(data.dashboard_generated_time_iso);
             } else {
-                convertAllUTCToLocal(); // Fallback to re-process existing datetime elements
+                // If API doesn't send new time, re-run to format dates in tables
+                convertAllUTCToLocal();
             }
 
 
@@ -223,16 +221,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial call and interval for refresh
     if (AUTO_REFRESH_INTERVAL_MS > 0) {
-        refreshTicketData(); // Call once immediately to load data via JS if desired (optional, page loads with server data first)
-setInterval(refreshTicketData, AUTO_REFRESH_INTERVAL_MS);
-console.log(`Ticket data will refresh every ${AUTO_REFRESH_INTERVAL_MS / 1000} seconds.`);
+        // Call once after a brief delay to allow initial elements to render and be processed by convertAllUTCToLocal from server data
+        setTimeout(refreshTicketData, 100);
+        setInterval(refreshTicketData, AUTO_REFRESH_INTERVAL_MS);
+        console.log(`Ticket data will refresh every ${AUTO_REFRESH_INTERVAL_MS / 1000} seconds.`);
     } else {
         // If auto-refresh is disabled, still ensure initial dates are converted.
         // This is already called at the end of DOMContentLoaded for server-rendered dates.
-        // And update the dashboard generated time once from initial load data.
-        const initialDashboardTimeIso = "{{ dashboard_generated_time_iso }}"; // Jinja var from initial page load
-        if (initialDashboardTimeIso) {
-            convertAllUTCToLocal(initialDashboardTimeIso);
+        // Update the dashboard generated time once from initial load data passed via window object.
+        if (window.DASHBOARD_GENERATED_TIME_ISO_INITIAL) { // Assuming you set this in index.html's script tag
+            convertAllUTCToLocal(window.DASHBOARD_GENERATED_TIME_ISO_INITIAL);
+        } else {
+            // Fallback if the initial time wasn't passed via a specific global var for this else block
+            const dashboardTimeEl = document.getElementById('dashboard-generated-time');
+            if (dashboardTimeEl && dashboardTimeEl.textContent === "Loading...") {
+                dashboardTimeEl.textContent = "Auto-refresh disabled";
+            }
         }
     }
 });
