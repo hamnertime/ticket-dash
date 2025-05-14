@@ -150,6 +150,3 @@ Contributions, issues, and feature requests are welcome! Please feel free to:
 * Open an issue for bugs or suggestions.
 * Fork the repository and submit a pull request.
 
-## License
-
-This project is open source. Consider adding a `LICENSE.md` file (e.g., with the AGPL License):
