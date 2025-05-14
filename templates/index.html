@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integotec - Ticket Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Integotec - Ticket Dashboard</h1>
+        <div class="info-bar">
+            <span>Total Active Tickets: <strong>{{ s1_open_tickets|length + s2_waiting_agent_tickets|length + s3_remaining_tickets|length }}</strong></span>
+            {# The "Dashboard Generated" time display has been removed from here #}
+            <button id="theme-toggle">Toggle Theme</button>
+        </div>
+
+        {# --- Section 1: Open Tickets --- #}
+        <div class="section-header">Open Tickets ({{ s1_open_tickets|length }})</div>
+        {% if s1_open_tickets %}
+            <table class="ticket-table">
+                <thead>
+                    <tr>
+                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
+                        <th class="col-priority">Priority</th> <th class="col-action-sla">Action / SLA</th>
+                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in s1_open_tickets %}
+                    <tr>
+                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
+                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ ticket.requester_name }}</td>
+                        <td>{{ ticket.agent_name }}</td>
+                        <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
+                        <td class="col-action-sla">
+                            <span class="sla-status-text {{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
+                            {% if ticket.first_responded_at_dt is none and ticket.fr_due_by_dt %}
+                                <div class="datetime-container" data-utc-datetime="{{ ticket.fr_due_by_str }}" data-prefix="FR Due: ">
+                                    <small class="local-datetime">Loading...</small>
+                                    {# <small class="utc-detail" style="display:none;">{{ ticket.fr_due_by_str }}</small> #}
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>{{ ticket.updated_friendly }}</td>
+                        <td>{{ ticket.created_days_old }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-tickets-message">No tickets currently in 'Open' status.</p>
+        {% endif %}
+
+        {# --- Section 2: Waiting on Agent --- #}
+        <div class="section-header">Waiting on Agent ({{ s2_waiting_agent_tickets|length }})</div>
+        {% if s2_waiting_agent_tickets %}
+            <table class="ticket-table">
+                <thead>
+                    <tr>
+                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
+                        <th class="col-priority">Priority</th> <th class="col-action-sla">Action / Status</th>
+                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in s2_waiting_agent_tickets %}
+                    <tr>
+                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
+                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ ticket.requester_name }}</td>
+                        <td>{{ ticket.agent_name }}</td>
+                        <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
+                        <td class="col-action-sla">
+                            <span class="sla-status-text {{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
+                        </td>
+                        <td>{{ ticket.updated_friendly }}</td>
+                        <td>{{ ticket.created_days_old }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-tickets-message">No tickets currently in 'Waiting on Agent' status.</p>
+        {% endif %}
+
+        {# --- Section 3: Remaining Active Tickets --- #}
+        <div class="section-header">Remaining Active Tickets ({{ s3_remaining_tickets|length }})</div>
+        {% if s3_remaining_tickets %}
+            <table class="ticket-table">
+                <thead>
+                    <tr>
+                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
+                        <th class="col-priority">Priority</th> <th class="col-action-sla">Current Stage / Agent Action</th>
+                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in s3_remaining_tickets %}
+                    <tr>
+                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
+                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ ticket.requester_name }}</td>
+                        <td>{{ ticket.agent_name }}</td>
+                        <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
+                        <td class="col-action-sla">
+                            <span class="sla-status-text {{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
+                            {% if ticket.sla_class == 'sla-critical' and 'Review Needed' in ticket.sla_text %}
+                               <br><small>Agent replied: {{ ticket.agent_responded_friendly }}</small>
+                            {% elif ticket.status_raw == WAITING_ON_CUSTOMER_STATUS_ID %}
+                                {# Python logic now includes agent response time in sla_text for this status if available #}
+                            {% endif %}
+                        </td>
+                        <td>{{ ticket.updated_friendly }}</td>
+                        <td>{{ ticket.created_days_old }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-tickets-message">No other active tickets found.</p>
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script>
+        const refreshInterval = {{ auto_refresh_ms }};
+        if (refreshInterval > 0) {
+            setTimeout(function(){ window.location.reload(true); }, refreshInterval);
+        }
+    </script>
+</body>
+</html>

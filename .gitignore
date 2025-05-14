@@ -35,3 +35,6 @@ Thumbs.db
 # Other common files to ignore
 *.bak
 *.tmp
+ticket_poller.lock
+agents.txt
+requesters.txt

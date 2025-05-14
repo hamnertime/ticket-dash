@@ -1,0 +1,223 @@
+/* static/css/style.css */
+:root {
+    /* Dark Mode Variables */
+    --body-bg: #1e1e2f;
+    --body-text: #e0e0ff;
+    --container-max-width: 98%;
+    --h1-color: #82aaff;
+    --info-bar-bg: #2a2a40;
+    --section-header-bg: #30304a;
+    --section-header-text: #c0c0ff;
+    --table-bg: #252538;
+    --table-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    --table-border: #3a3a50;
+    --table-th-bg: #30304a;
+    --table-th-text: #c0c0ff;
+    --table-row-even-bg: #28283c;
+    --table-row-hover-bg: #353550;
+    --ticket-id-link: #82aaff;
+    --tooltip-bg: #181825;
+    --tooltip-text: #e0e0ff;
+    --sla-normal-text: #66bb6a;
+    --sla-warning-text: #ffa726;
+    --sla-critical-text: #ef5350;
+    --sla-overdue-text: #f44336;
+    --sla-none-text: #bdbdbd;
+    --sla-responded-text: #90a4ae;
+    --sla-in-progress-text: #78909c;
+    --priority-low-text: #81c784;
+    --priority-medium-text: #ffee58;
+    --priority-high-text: #ff7043;
+    --priority-urgent-text: #d32f2f;
+    --theme-toggle-bg: var(--info-bar-bg);
+    --theme-toggle-text: var(--body-text);
+    --theme-toggle-border: var(--table-border);
+}
+
+body.light-mode {
+    /* Light Mode Variables */
+    --body-bg: #f4f6f8;
+    --body-text: #212529;
+    --h1-color: #0056b3;
+    --info-bar-bg: #e9ecef;
+    --section-header-bg: #dee2e6;
+    --section-header-text: #343a40;
+    --table-bg: #ffffff;
+    --table-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    --table-border: #ced4da;
+    --table-th-bg: #e9ecef;
+    --table-th-text: #495057;
+    --table-row-even-bg: #f8f9fa;
+    --table-row-hover-bg: #e2e6ea;
+    --ticket-id-link: #007bff;
+    --tooltip-bg: #343a40;
+    --tooltip-text: #ffffff;
+    --sla-normal-text: #28a745;
+    --sla-warning-text: #ffc107;
+    --sla-critical-text: #dc3545;
+    --sla-overdue-text: #c82333;
+    --sla-none-text: #6c757d;
+    --sla-responded-text: #545b62;
+    --sla-in-progress-text: #495057;
+    --priority-low-text: #28a745;
+    --priority-medium-text: #e69500;
+    --priority-high-text: #fd7e14;
+    --priority-urgent-text: #dc3545;
+    --theme-toggle-bg: var(--info-bar-bg);
+    --theme-toggle-text: var(--body-text);
+    --theme-toggle-border: var(--table-border);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    background-color: var(--body-bg);
+    color: var(--body-text);
+    margin: 0;
+    padding: 15px;
+    font-size: 18px;
+    line-height: 1.6;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+.container { max-width: var(--container-max-width); margin: 0 auto; }
+h1 { text-align: center; color: var(--h1-color); margin-bottom: 15px; font-size: 2.2em; }
+
+.info-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--info-bar-bg);
+    color: var(--body-text);
+    padding: 10px 15px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+.info-bar strong, .info-bar em {
+    color: var(--body-text);
+}
+
+#theme-toggle {
+    background-color: var(--theme-toggle-bg);
+    color: var(--theme-toggle-text);
+    border: 1px solid var(--theme-toggle-border);
+    padding: 8px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.95em;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+#theme-toggle:hover { opacity: 0.8; }
+
+.section-header {
+    background-color: var(--section-header-bg);
+    color: var(--section-header-text);
+    padding: 12px 18px;
+    margin-top: 25px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    font-size: 1.5em;
+    font-weight: 600;
+}
+.section-header:first-of-type { margin-top: 10px; }
+
+.ticket-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: var(--table-bg);
+    box-shadow: var(--table-shadow);
+    font-size: 1em;
+    margin-bottom: 20px;
+}
+.ticket-table th, .ticket-table td {
+    border: 1px solid var(--table-border);
+    padding: 11px 13px;
+    text-align: left;
+    vertical-align: top;
+}
+.ticket-table th {
+    background-color: var(--table-th-bg);
+    color: var(--table-th-text);
+    font-weight: 600;
+    font-size: 1.05em;
+}
+.ticket-table tr:nth-child(even) { background-color: var(--table-row-even-bg); }
+.ticket-table tr:hover { background-color: var(--table-row-hover-bg); }
+.ticket-id a { font-weight: 600; color: var(--ticket-id-link); text-decoration: none; }
+.ticket-id a:hover { text-decoration: underline; }
+.ticket-subject { font-weight: 500; /* max-width: 350px; MODIFIED - See .col-subject */ word-break: break-word; }
+
+.description-tooltip { position: relative; cursor: help; }
+.description-tooltip .tooltiptext {
+    visibility: hidden;
+    width: 340px;
+    background-color: var(--tooltip-bg);
+    color: var(--tooltip-text);
+    text-align: left;
+    border-radius: 6px;
+    padding: 12px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -170px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.9em;
+    line-height: 1.4;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+.description-tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+
+/* SLA Statuses */
+.sla-status-text.sla-normal { color: var(--sla-normal-text); }
+.sla-status-text.sla-warning { color: var(--sla-warning-text); font-weight: 600; }
+.sla-status-text.sla-critical { color: var(--sla-critical-text); font-weight: 600; }
+.sla-status-text.sla-overdue {
+    color: var(--sla-overdue-text);
+    font-weight: 700;
+    animation: blink-animation 1.2s steps(5, start) infinite;
+}
+.sla-status-text.sla-none { color: var(--sla-none-text); }
+.sla-status-text.sla-responded { color: var(--sla-responded-text); font-style: italic; }
+.sla-status-text.sla-in-progress { color: var(--sla-in-progress-text); font-style: italic; }
+
+@keyframes blink-animation { to { visibility: hidden; } }
+
+/* Priorities */
+.priority-Low { color: var(--priority-low-text); }
+.priority-Medium { color: var(--priority-medium-text); }
+.priority-High { color: var(--priority-high-text); font-weight: 600; }
+.priority-Urgent {
+    color: var(--priority-urgent-text);
+    font-weight: 700;
+    animation: blink-animation 1.2s steps(5, start) infinite alternate;
+}
+
+/* MODIFIED Column Widths */
+.col-id { width: 5%; }
+.col-subject { width: 30%; max-width: 30%; } /* Added max-width to enforce, original max-width on .ticket-subject removed */
+.col-requester {width: 9%;}
+.col-agent { width: 9%; }
+/* .col-status REMOVED */
+.col-priority { width: 8%; }
+.col-action-sla { width: 23%; }
+.col-updated { width: 8%; }
+.col-created { width: 8%; }
+
+.no-tickets-message { text-align: center; font-size: 1.2em; padding: 20px; color: #aaa; }
+body.light-mode .no-tickets-message { color: #666; }
+
+/* Datetime display helpers */
+.datetime-container .local-datetime { display: block; font-size: 1em; }
+.datetime-container .friendly-datetime, /* This class may no longer be used in HTML for Update/Created */
+.datetime-container .utc-detail { display: block; font-size: 0.85em; opacity: 0.75; margin-top: 2px; }
+
+@media (min-width: 1900px) {
+    body { font-size: 20px; padding: 20px; }
+    h1 { font-size: 2.8em; margin-bottom: 20px; }
+    .info-bar { padding: 14px 20px; font-size: 1.2em; margin-bottom: 20px;}
+    .ticket-table th, .ticket-table td { padding: 14px 17px; }
+    .ticket-table th {font-size: 1.1em;}
+    /* .ticket-subject { max-width: 450px; } - Controlled by .col-subject now */
+    .section-header { font-size: 1.8em; padding: 14px 20px;}
+}

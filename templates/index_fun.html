@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integotec - Ticket Dashboard</title>
+    <style>
+        /* --- CSS styles remain the same as the previous version --- */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; background-color: #1e1e2f; color: #e0e0ff; margin: 0; padding: 15px; font-size: 14px; line-height: 1.5; }
+        .container { max-width: 98%; margin: 0 auto; }
+        h1 { text-align: center; color: #82aaff; margin-bottom: 15px; font-size: 2.2em; }
+        .info-bar { display: flex; justify-content: space-between; align-items: center; background-color: #2a2a40; padding: 8px 12px; border-radius: 6px; margin-bottom: 15px; font-size: 1.1em; }
+        .section-header { background-color: #30304a; color: #c0c0ff; padding: 10px 15px; margin-top: 25px; margin-bottom: 10px; border-radius: 5px; font-size: 1.5em; font-weight: 600; }
+        .section-header:first-of-type { margin-top: 10px; }
+        .ticket-table { width: 100%; border-collapse: collapse; background-color: #252538; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 1em; margin-bottom: 20px; }
+        .ticket-table th, .ticket-table td { border: 1px solid #3a3a50; padding: 10px 12px; text-align: left; vertical-align: top; }
+        .ticket-table th { background-color: #30304a; color: #c0c0ff; font-weight: 600; font-size: 1.05em; }
+        .ticket-table tr:nth-child(even) { background-color: #28283c; }
+        .ticket-table tr:hover { background-color: #353550; }
+        .ticket-id a { font-weight: 600; color: #82aaff; text-decoration: none; }
+        .ticket-id a:hover { text-decoration: underline; }
+        .ticket-subject { font-weight: 500; max-width: 350px; word-break: break-word; }
+        .description-tooltip { position: relative; cursor: help; }
+        .description-tooltip .tooltiptext { visibility: hidden; width: 300px; background-color: #111; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -150px; opacity: 0; transition: opacity 0.3s; font-size: 0.9em; line-height: 1.4; }
+        .description-tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        .sla-normal { color: #66bb6a; } .sla-warning { color: #ffa726; font-weight: 600;} .sla-critical { color: #ef5350; font-weight: 600;} .sla-overdue { color: #f44336; font-weight: 700; animation: blink-animation 1.2s steps(5, start) infinite; } .sla-none { color: #bdbdbd; } .sla-responded { color: #90a4ae; font-style: italic; } .sla-in-progress { color: #78909c; font-style: italic; }
+        @keyframes blink-animation { to { visibility: hidden; } }
+        .priority-Low { color: #81c784; } .priority-Medium { color: #ffee58; } .priority-High { color: #ff7043; font-weight: 600; } .priority-Urgent { color: #d32f2f; font-weight: 700; animation: blink-animation 1.2s steps(5, start) infinite alternate; }
+        .col-id { width: 5%; } .col-subject { width: 25%; } .col-requester {width: 9%;} .col-agent { width: 9%; } .col-status { width: 10%; } .col-priority { width: 8%; } .col-action-sla { width: 18%; } .col-updated { width: 8%; } .col-created { width: 8%; }
+        .no-tickets-message { text-align: center; font-size: 1.2em; padding: 20px; color: #aaa; }
+        @media (min-width: 1900px) { body { font-size: 16px; padding: 20px; } h1 { font-size: 2.8em; margin-bottom: 20px; } .info-bar { padding: 12px 18px; font-size: 1.2em; margin-bottom: 20px;} .ticket-table th, .ticket-table td { padding: 12px 15px; } .ticket-table th {font-size: 1.1em;} .ticket-subject { max-width: 450px; } .section-header { font-size: 1.8em; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Integotec - Ticket Dashboard</h1>
+        <div class="info-bar">
+            <span>Total Active Tickets: <strong>{{ s1_open_tickets|length + s2_waiting_agent_tickets|length + s3_remaining_tickets|length }}</strong></span>
+            <span>Dashboard Generated: <em>{{ dashboard_generated_time }}</em></span>
+        </div>
+
+        {# --- Section 1: Open Tickets (Status ID 2) --- #}
+        <div class="section-header">Open Tickets ({{ s1_open_tickets|length }})</div>
+        {% if s1_open_tickets %}
+            <table class="ticket-table">
+                <thead>
+                    <tr>
+                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
+                        <th class="col-status">Status</th> <th class="col-priority">Priority</th> <th class="col-action-sla">Action / SLA</th>
+                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in s1_open_tickets %}
+                    <tr>
+                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
+                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ ticket.requester_id if ticket.requester_id else 'N/A' }}</td>
+                        <td>{{ ticket.responder_id if ticket.responder_id else 'Unassigned' }}</td>
+                        <td>{{ ticket.status_text }}</td> <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
+                        <td class="col-action-sla">
+                            <span class="{{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
+                            {% if ticket.first_responded_at_dt is none and ticket.fr_due_by_dt %}
+                                <br><small>FR Due: ({{ ticket.fr_due_by_dt.strftime('%b %d, %H:%M') }})</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ ticket.updated_friendly }}{% if ticket.updated_at_dt %}<br><small>({{ ticket.updated_at_dt.strftime('%b %d, %H:%M') }})</small>{% endif %}</td>
+                        <td>{% if ticket.created_at_dt %}{{ ticket.created_at_dt.strftime('%b %d, %Y') }}{% else %}N/A{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-tickets-message">No tickets currently in 'Open' status.</p>
+        {% endif %}
+
+        {# --- Section 2: Waiting on Agent (Sorted by last update, oldest first) --- #}
+        <div class="section-header">Waiting on Agent ({{ s2_waiting_agent_tickets|length }})</div>
+        {% if s2_waiting_agent_tickets %}
+            <table class="ticket-table">
+                <thead>
+                    <tr>
+                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
+                        <th class="col-status">Status</th> <th class="col-priority">Priority</th> <th class="col-action-sla">Action / Status</th>
+                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in s2_waiting_agent_tickets %}
+                    <tr>
+                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
+                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ ticket.requester_id if ticket.requester_id else 'N/A' }}</td>
+                        <td>{{ ticket.responder_id if ticket.responder_id else 'Unassigned' }}</td>
+                        <td>{{ ticket.status_text }}</td> <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
+                        <td class="col-action-sla">
+                            <span class="{{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
+                             <br><small>Agent replied: {{ ticket.agent_responded_friendly }}</small>
+                        </td>
+                        <td>{{ ticket.updated_friendly }}{% if ticket.updated_at_dt %}<br><small>({{ ticket.updated_at_dt.strftime('%b %d, %H:%M') }})</small>{% endif %}</td>
+                        <td>{% if ticket.created_at_dt %}{{ ticket.created_at_dt.strftime('%b %d, %Y') }}{% else %}N/A{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-tickets-message">No tickets currently in 'Waiting on Agent' status.</p>
+        {% endif %}
+
+        {# --- Section 3: Remaining Active Tickets --- #}
+        <div class="section-header">Remaining Active Tickets ({{ s3_remaining_tickets|length }})</div>
+        {% if s3_remaining_tickets %}
+            <table class="ticket-table">
+                <thead>
+                    <tr>
+                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
+                        <th class="col-status">Status</th> <th class="col-priority">Priority</th> <th class="col-action-sla">Current Stage / Agent Action</th>
+                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in s3_remaining_tickets %}
+                    <tr>
+                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
+                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ ticket.requester_id if ticket.requester_id else 'N/A' }}</td>
+                        <td>{{ ticket.responder_id if ticket.responder_id else 'Unassigned' }}</td>
+                        <td>{{ ticket.status_text }}</td>
+                        <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
+                        <td class="col-action-sla">
+                            <span class="{{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
+                            {% if ticket.sla_class == 'sla-critical' and 'Review Needed' in ticket.sla_text %}
+                               <br><small>Agent replied: {{ ticket.agent_responded_friendly }}</small>
+                            {% elif ticket.status_raw == WAITING_ON_CUSTOMER_STATUS_ID %}
+                                {% endif %}
+                        </td>
+                        <td>{{ ticket.updated_friendly }}{% if ticket.updated_at_dt %}<br><small>({{ ticket.updated_at_dt.strftime('%b %d, %H:%M') }})</small>{% endif %}</td>
+                        <td>{% if ticket.created_at_dt %}{{ ticket.created_at_dt.strftime('%b %d, %Y') }}{% else %}N/A{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-tickets-message">No other active tickets found.</p>
+        {% endif %}
+
+    </div>
+
+    <script>
+        const refreshInterval = {{ auto_refresh_ms }};
+        if (refreshInterval > 0) {
+            setTimeout(function(){ window.location.reload(true); }, refreshInterval);
+        }
+    </script>
+</body>
+</html>
