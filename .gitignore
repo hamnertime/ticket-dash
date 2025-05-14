@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+*.venv
+env/
+venv/
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Secrets - CRITICAL
+token.txt # For Freshservice API Key
+
+# SSL Certificates and Keys (if self-signed or not meant for public repo)
+# If your certs are for public use and part of deployment, you might reconsider these.
+# For development or unique certs, definitely ignore.
+cert.pem
+key.pem
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Other common files to ignore
+*.bak
+*.tmp
