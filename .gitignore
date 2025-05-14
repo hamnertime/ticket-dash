@@ -20,6 +20,7 @@ logs/
 
 # Secrets - CRITICAL
 token.txt # For Freshservice API Key
+*.txt
 tickets/*
 
 # SSL Certificates and Keys (if self-signed or not meant for public repo)
