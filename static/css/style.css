@@ -15,7 +15,7 @@
     --table-th-text: #c0c0ff;
     --table-row-even-bg: #28283c;
     --table-row-hover-bg: #353550;
-    --ticket-id-link: #82aaff;
+    --ticket-id-link: #82aaff; /* Kept as ticket-id-link for now, can be incident-id-link if preferred */
     --tooltip-bg: #181825;
     --tooltip-text: #e0e0ff;
     --sla-normal-text: #66bb6a;
@@ -97,14 +97,14 @@ h1 { text-align: center; color: var(--h1-color); margin-bottom: 15px; font-size:
 }
 
 #theme-toggle {
-    background-color: var(--theme-toggle-bg);
-    color: var(--theme-toggle-text);
-    border: 1px solid var(--theme-toggle-border);
-    padding: 8px 14px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 0.95em;
-    transition: background-color 0.2s ease, color 0.2s ease;
+background-color: var(--theme-toggle-bg);
+color: var(--theme-toggle-text);
+border: 1px solid var(--theme-toggle-border);
+padding: 8px 14px;
+border-radius: 5px;
+cursor: pointer;
+font-size: 0.95em;
+transition: background-color 0.2s ease, color 0.2s ease;
 }
 #theme-toggle:hover { opacity: 0.8; }
 
@@ -120,7 +120,7 @@ h1 { text-align: center; color: var(--h1-color); margin-bottom: 15px; font-size:
 }
 .section-header:first-of-type { margin-top: 10px; }
 
-.ticket-table {
+.ticket-table { /* Class name kept for now, can be .incident-table */
     width: 100%;
     border-collapse: collapse;
     background-color: var(--table-bg);
@@ -142,9 +142,37 @@ h1 { text-align: center; color: var(--h1-color); margin-bottom: 15px; font-size:
 }
 .ticket-table tr:nth-child(even) { background-color: var(--table-row-even-bg); }
 .ticket-table tr:hover { background-color: var(--table-row-hover-bg); }
+
+/* Styles for sortable headers */
+.sortable-header {
+    cursor: pointer;
+    position: relative; /* For positioning the arrow */
+}
+.sortable-header:hover {
+    /* Use a slightly different background on hover for TH if desired */
+    background-color: var(--table-row-hover-bg);
+}
+.sortable-header::after {
+    content: '';
+    display: inline-block;
+    width: 1em; /* Reserve space for arrow */
+    text-align: right;
+    margin-left: 5px;
+    opacity: 0.5;
+}
+.sortable-header.sort-asc::after {
+    content: '▲';
+    opacity: 1;
+}
+.sortable-header.sort-desc::after {
+    content: '▼';
+    opacity: 1;
+}
+
+
 .ticket-id a { font-weight: 600; color: var(--ticket-id-link); text-decoration: none; }
 .ticket-id a:hover { text-decoration: underline; }
-.ticket-subject { font-weight: 500; /* max-width: 350px; MODIFIED - See .col-subject */ word-break: break-word; }
+.ticket-subject { font-weight: 500; word-break: break-word; }
 
 .description-tooltip { position: relative; cursor: help; }
 .description-tooltip .tooltiptext {
@@ -159,7 +187,7 @@ h1 { text-align: center; color: var(--h1-color); margin-bottom: 15px; font-size:
     z-index: 1;
     bottom: 125%;
     left: 50%;
-    margin-left: -170px;
+    margin-left: -170px; /* Half of width */
     opacity: 0;
     transition: opacity 0.3s;
     font-size: 0.9em;
@@ -193,23 +221,25 @@ h1 { text-align: center; color: var(--h1-color); margin-bottom: 15px; font-size:
     animation: blink-animation 1.2s steps(5, start) infinite alternate;
 }
 
-/* MODIFIED Column Widths */
+/* Column Widths */
 .col-id { width: 5%; }
-.col-subject { width: 30%; max-width: 30%; } /* Added max-width to enforce, original max-width on .ticket-subject removed */
+.col-subject { width: 30%; max-width: 30%; }
 .col-requester {width: 9%;}
 .col-agent { width: 9%; }
-/* .col-status REMOVED */
 .col-priority { width: 8%; }
 .col-action-sla { width: 23%; }
 .col-updated { width: 8%; }
 .col-created { width: 8%; }
 
-.no-tickets-message { text-align: center; font-size: 1.2em; padding: 20px; color: #aaa; }
+.no-tickets-message { /* Class name kept for now */
+    text-align: center;
+    font-size: 1.2em;
+    padding: 20px;
+    color: #aaa;
+}
 body.light-mode .no-tickets-message { color: #666; }
 
-/* Datetime display helpers */
 .datetime-container .local-datetime { display: block; font-size: 1em; }
-.datetime-container .friendly-datetime, /* This class may no longer be used in HTML for Update/Created */
 .datetime-container .utc-detail { display: block; font-size: 0.85em; opacity: 0.75; margin-top: 2px; }
 
 @media (min-width: 1900px) {
@@ -218,6 +248,5 @@ body.light-mode .no-tickets-message { color: #666; }
     .info-bar { padding: 14px 20px; font-size: 1.2em; margin-bottom: 20px;}
     .ticket-table th, .ticket-table td { padding: 14px 17px; }
     .ticket-table th {font-size: 1.1em;}
-    /* .ticket-subject { max-width: 450px; } - Controlled by .col-subject now */
     .section-header { font-size: 1.8em; padding: 14px 20px;}
 }
