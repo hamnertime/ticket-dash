@@ -8,6 +8,9 @@ After=network.target
 
 [Service]
 User=integotec
+# IMPORTANT: Verify 'integotec' is the correct primary group for the 'integotec' user.
+# Use 'id integotec' to check, and update if different.
+Group=integotec
 WorkingDirectory=/home/integotec/ticket-dash
 
 # The command to start your application
@@ -22,15 +25,12 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
-# Security hardening (optional, but good practice)
-PrivateTmp=true
-ProtectSystem=full
-NoNewPrivileges=true
-# Your gui.py currently uses "./tickets", so it would write to /home/integotec/ticket-dash/tickets
-# It also reads cert.pem, key.pem, agents.txt, requesters.txt from the WorkingDirectory.
-# It reads from ./tickets
-ReadWritePaths=/home/integotec/ticket-dash/tickets
-ReadOnlyPaths=/home/integotec/ticket-dash/cert.pem /home/integotec/ticket-dash/key.pem /home/integotec/ticket-dash/agents.txt /home/integotec/ticket-dash/requesters.txt /home/integotec/ticket-dash/token.txt
+# Security hardening (TEMPORARILY COMMENTED OUT FOR TESTING)
+# PrivateTmp=true
+# ProtectSystem=full
+# NoNewPrivileges=true
+# ReadWritePaths=/home/integotec/ticket-dash/tickets
+# ReadOnlyPaths=/home/integotec/ticket-dash/cert.pem /home/integotec/ticket-dash/key.pem /home/integotec/ticket-dash/agents.txt /home/integotec/ticket-dash/requesters.txt /home/integotec/ticket-dash/token.txt
 
 [Install]
 WantedBy=multi-user.target
