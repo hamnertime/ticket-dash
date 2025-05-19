@@ -1,15 +1,17 @@
 [Unit]
 Description=Luxafor Blinky Service for Ticket Dash
-After=network.target ticket-watcher.service # Ensures network is up and ticket_watcher has started
-Wants=ticket-watcher.service                 # Tries to start ticket-watcher.service if not already running
+# Ensures network is up and ticket_watcher has started
+After=network.target ticket-watcher.service
+# Tries to start ticket-watcher.service if not already running
+Wants=ticket-watcher.service
 
 [Service]
 User=integotec
-Group=www-data # Or the primary group of ticketdashuser, or 'dialout'/'plugdev' (see notes)
 WorkingDirectory=/home/integotec/ticket-dash
 
 # Command to start the blinky.py script
 # Ensure 'python3' is the correct interpreter and can find necessary libraries (e.g., pyluxafor)
+# If using a virtualenv: /home/integotec/ticket-dash/pyenv/bin/python3
 ExecStart=/usr/bin/python3 /home/integotec/ticket-dash/blinky.py
 
 # Restart policy
