@@ -24,15 +24,6 @@ RestartSec=30
 StandardOutput=journal
 StandardError=journal
 
-# Security hardening (optional, but good practice)
-PrivateTmp=true
-ProtectSystem=full
-NoNewPrivileges=true
-# The script writes to ./tickets, ./ticket_poller.log, and ./ticket_poller.lock
-# and reads ./token.txt
-# These will be relative to WorkingDirectory. Ensure integotec has write permissions.
-ReadWritePaths=/home/integotec/ticket-dash/tickets /home/integotec/ticket-dash/ticket_poller.log /home/integotec/ticket-dash/ticket_poller.lock
-ReadOnlyPaths=/home/integotec/ticket-dash/token.txt
 
 [Install]
 WantedBy=multi-user.target
