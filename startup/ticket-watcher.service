@@ -5,12 +5,16 @@ After=network.target
 
 [Service]
 User=integotec
+Group=integotec # Assuming 'integotec' is also the group
 WorkingDirectory=/home/integotec/ticket-dash
 
 # Command to start the ticket_watcher.py script
-# Ensure 'python3' is the correct interpreter and can find necessary libraries (e.g., requests)
 # If using a virtualenv: /home/integotec/ticket-dash/pyenv/bin/python3
 ExecStart=/usr/bin/python3 /home/integotec/ticket-dash/ticket_watcher.py
+
+# Command to remove the lock file after the service stops
+# The '-' before /bin/rm means that systemd will not consider the service failed if this command fails
+ExecStopPost=-/bin/rm -f /home/integotec/ticket-dash/ticket_poller.lock
 
 # Restart policy
 Restart=always
