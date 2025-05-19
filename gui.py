@@ -444,7 +444,7 @@ if __name__ == '__main__':
     app.logger.info(f"Incident Dashboard will be available at {protocol}://localhost:{port}/")
 
     try:
-        app.run(host='0.0.0.0', port=port, debug=True, ssl_context=ssl_context)
+        app.run(host='0.0.0.0', port=port, debug=False, ssl_context=ssl_context)
     except OSError as e:
         if ("Permission denied" in str(e) or "Errno 13" in str(e)) and port == 443 and os.name != 'nt':
             app.logger.error(f"OSError: {e}. Could not bind to port 443. Try running with sudo.")
