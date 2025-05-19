@@ -5,7 +5,6 @@ After=network.target
 
 [Service]
 User=integotec
-Group=integotec # Assuming 'integotec' is also the group
 WorkingDirectory=/home/integotec/ticket-dash
 
 # Command to start the ticket_watcher.py script

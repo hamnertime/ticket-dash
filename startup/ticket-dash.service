@@ -8,7 +8,6 @@ After=network.target
 
 [Service]
 User=integotec
-Group=integotec # Assuming 'integotec' is also the group
 WorkingDirectory=/home/integotec/ticket-dash
 
 # The command to start your application
