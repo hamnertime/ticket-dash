@@ -1,0 +1,36 @@
+[Unit]
+Description=Ticket Dash Flask Application
+After=network.target
+# If your ticket_watcher.py also needs to run as a service and gui.py depends on it,
+# you might add:
+# Wants=ticket-watcher.service
+# After=network.target ticket-watcher.service
+
+[Service]
+User=integotec                           # Replace with your desired non-root user
+Group=www-data                                # Or the group of ticketdashuser
+WorkingDirectory=/home/integotec/ticket-dash             # Replace with the actual path to your app
+
+# The command to start your application
+ExecStart=/usr/bin/authbind --deep python3 /home/integotec/ticket-dash/gui.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Standard output and error logging
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening (optional, but good practice)
+PrivateTmp=true
+ProtectSystem=full
+NoNewPrivileges=true
+# If your app needs to write to specific directories (other than TICKETS_DIR if it's relative to WorkingDirectory)
+# you might need to adjust ProtectSystem or use ReadWritePaths.
+# For example, if TICKETS_DIR is /var/ticket-dash-data:
+# ReadWritePaths=/var/ticket-dash-data
+# Your gui.py currently uses "./tickets", so it would write to /srv/ticket-dash/tickets
+
+[Install]
+WantedBy=multi-user.target

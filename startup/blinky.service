@@ -1,0 +1,31 @@
+[Unit]
+Description=Luxafor Blinky Service for Ticket Dash
+After=network.target ticket-watcher.service # Ensures network is up and ticket_watcher has started
+Wants=ticket-watcher.service                 # Tries to start ticket-watcher.service if not already running
+
+[Service]
+User=integotec
+Group=www-data # Or the primary group of ticketdashuser, or 'dialout'/'plugdev' (see notes)
+WorkingDirectory=/home/integotec/ticket-dash
+
+# Command to start the blinky.py script
+# Ensure 'python3' is the correct interpreter and can find necessary libraries (e.g., pyluxafor)
+ExecStart=/usr/bin/python3 /home/integotec/ticket-dash/blinky.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Standard output and error logging
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+PrivateTmp=true
+ProtectSystem=full
+NoNewPrivileges=true
+# The script reads from ./tickets.
+ReadOnlyPaths=/home/integotec/ticket-dash/tickets
+
+[Install]
+WantedBy=multi-user.target
