@@ -27,8 +27,7 @@ TICKETS_DIR = "./tickets"
 ARCHIVE_DIR_BASE = os.path.join(TICKETS_DIR, "archive")
 POLL_INTERVAL = 30 # seconds
 LOG_FILE = "./ticket_poller.log"
-LOCK_FILE = "./ticket_poller.lock"
-
+# LOCK_FILE = "./ticket_poller.lock" # Removed lock file logic
 
 # --- Logging Function ---
 def log_message(message, is_error=False):
@@ -128,8 +127,6 @@ def archive_ticket_file(ticket_id):
         except Exception as e:
             log_message(f"Error archiving ticket {ticket_id} from {source_path} to {destination_path}: {e}", is_error=True)
     else:
-        # This case might occur if a ticket was manually deleted from TICKETS_DIR
-        # or if there's a logic discrepancy.
         log_message(f"Archive source file {source_path} not found for ticket {ticket_id}.", is_error=True)
 
 
@@ -140,11 +137,9 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
     filter_endpoint = f"{base_url}/api/v2/tickets/filter"
     fetched_ids_current_run = set() # To avoid duplicates if API returns them across pages
 
-    # Construct the query string for multiple statuses: "status:2 OR status:3 OR ..."
     status_queries = [f"status:{status_id}" for status_id in status_ids]
-    # The query needs to be enclosed in parentheses if multiple OR conditions, and then double quotes for the API
     raw_query_value = f"({' OR '.join(status_queries)})"
-    query_param_value = f'"{raw_query_value}"' # Final query string for the 'query' parameter
+    query_param_value = f'"{raw_query_value}"'
 
     log_message(f"Fetching filtered ticket list. Query: {query_param_value}")
 
@@ -167,15 +162,14 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
                         continue
                     else:
                         log_message(f"List fetch rate limit exceeded after {MAX_RETRIES} retries.", is_error=True)
-                        return None # Critical failure for this cycle
+                        return None
 
-                if response.status_code == 400: # Bad Request, likely query syntax
+                if response.status_code == 400:
                     err_details = response.json() if response.content and 'application/json' in response.headers.get('Content-Type','') else response.text
                     log_message(f"400 Bad Request for list. URL: {response.url}. Details: {err_details}", is_error=True)
-                    return None # Critical failure
+                    return None
 
-                response.raise_for_status() # For other HTTP errors (401, 403, 5xx)
-
+                response.raise_for_status()
                 response_data = response.json()
                 current_page_tickets = response_data.get('tickets', [])
 
@@ -185,7 +179,6 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
 
                 new_on_page = 0
                 for ticket_data in current_page_tickets:
-                    # Ensure ticket_data is a dict and has an ID before adding
                     if isinstance(ticket_data, dict) and ticket_data.get('id') and ticket_data.get('id') not in fetched_ids_current_run:
                         fetched_ids_current_run.add(ticket_data['id'])
                         all_basic_tickets.append(ticket_data)
@@ -193,10 +186,10 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
                 log_message(f"List Page {page}: Fetched {len(current_page_tickets)} items, {new_on_page} new unique. Total basic: {len(all_basic_tickets)}")
 
                 if len(current_page_tickets) < TICKETS_PER_PAGE:
-                    return all_basic_tickets # Last page reached
+                    return all_basic_tickets
 
                 page += 1
-                break # Success for this page, move to next page or finish
+                break
 
             except requests.exceptions.Timeout:
                 log_message(f"Timeout on list fetch, page {page}. Retry {retries+1}/{MAX_RETRIES}...", is_error=True)
@@ -208,10 +201,9 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
                 time.sleep(RETRY_DELAY)
             else:
                 log_message(f"Failed list fetch for page {page} after {MAX_RETRIES} retries.", is_error=True)
-                return None # Critical failure for this page
-        if retries > MAX_RETRIES and page <= MAX_PAGES : # If loop exited due to retries on a page
+                return None
+        if retries > MAX_RETRIES and page <= MAX_PAGES :
              return None
-
 
     if page > MAX_PAGES:
         log_message(f"Warning: List fetch reached MAX_PAGES ({MAX_PAGES}). Some tickets might be missed if total > {MAX_PAGES * TICKETS_PER_PAGE}.", is_error=True)
@@ -220,15 +212,13 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
 # --- Fetch Single Ticket Details with Stats (Step 2) ---
 def get_ticket_details_with_stats(ticket_id, base_url, headers):
     detail_endpoint = f"{base_url}/api/v2/tickets/{ticket_id}"
-    params = {'include': 'stats'} # 'stats' include is crucial
+    params = {'include': 'stats'}
     retries = 0
 
     while retries <= MAX_RETRIES:
         try:
-            # log_message(f"Fetching details for ticket {ticket_id} (Attempt {retries + 1})") # Can be too verbose
             response = requests.get(detail_endpoint, headers=headers, params=params, timeout=20)
-
-            if response.status_code == 429: # Rate limit for individual ticket
+            if response.status_code == 429:
                 if retries < MAX_RETRIES:
                     retry_after = int(response.headers.get('Retry-After', INDIVIDUAL_TICKET_RETRY_DELAY))
                     log_message(f"Rate limit on detail fetch for ticket {ticket_id}. Waiting {retry_after}s. Retry {retries+1}/{MAX_RETRIES}...", is_error=True)
@@ -241,16 +231,15 @@ def get_ticket_details_with_stats(ticket_id, base_url, headers):
 
             if response.status_code == 404:
                 log_message(f"Ticket {ticket_id} not found (404). Might have been deleted since list fetch.", is_error=True)
-                return None # Ticket doesn't exist, can't get details
+                return None
 
-            response.raise_for_status() # For other errors like 401, 500, etc.
-
+            response.raise_for_status()
             response_json = response.json()
             if "ticket" in response_json:
-                return response_json["ticket"] # This should contain main fields + embedded stats
+                return response_json["ticket"]
             else:
                 log_message(f"Unexpected response structure for ticket {ticket_id} details (missing 'ticket' key): {response_json}", is_error=True)
-                return response_json # Return raw for debugging, but it's not the expected structure
+                return response_json
 
         except requests.exceptions.Timeout:
             log_message(f"Timeout fetching details for ticket {ticket_id}. Retry {retries+1}/{MAX_RETRIES}...", is_error=True)
@@ -266,8 +255,7 @@ def get_ticket_details_with_stats(ticket_id, base_url, headers):
         else:
             log_message(f"Failed to fetch details for ticket {ticket_id} after {MAX_RETRIES} retries.", is_error=True)
             return None
-    return None # Should be unreachable if loop logic is correct, but as a safeguard
-
+    return None
 
 # --- Main Background Process Loop ---
 def main_loop():
@@ -280,18 +268,15 @@ def main_loop():
     log_message(f"Delay between individual ticket detail fetches: {DELAY_BETWEEN_DETAIL_FETCHES}s")
     log_message(f"Only creating local files for tickets of type: 'Incident'")
 
-
     ensure_directories()
     API_KEY = read_api_key(TOKEN_FILE)
-    # Log only a portion of the API key for security
     log_message(f"API Key loaded: {API_KEY[:4]}...{API_KEY[-4:] if len(API_KEY) > 8 else API_KEY[:4] + '...'}")
 
-
-    auth_str = f"{API_KEY}:X" # API Key with a dummy password 'X'
+    auth_str = f"{API_KEY}:X"
     encoded_auth = base64.b64encode(auth_str.encode()).decode()
     headers = {
         "Content-Type": "application/json",
-        "Accept": "application/json", # Ensure we ask for JSON
+        "Accept": "application/json",
         "Authorization": f"Basic {encoded_auth}"
     }
 
@@ -299,47 +284,38 @@ def main_loop():
         current_cycle_start_time = time.time()
         log_message("--- Poll Cycle Start ---")
 
-        # Step 1: Get basic list of tickets matching the status filter
         basic_ticket_data_list = get_filtered_ticket_list(
             BASE_URL, headers, STATUS_IDS_TO_INCLUDE, ORDER_BY_FIELD, ORDER_TYPE
         )
 
-        if basic_ticket_data_list is None: # Indicates a failure in get_filtered_ticket_list
+        if basic_ticket_data_list is None:
             log_message("API fetch for ticket list failed. Retrying next cycle.", is_error=True)
-            time.sleep(POLL_INTERVAL) # Wait before retrying the whole cycle
+            time.sleep(POLL_INTERVAL)
             continue
 
-        enriched_ticket_data_list = [] # Holds tickets with full details (and are Incidents)
+        enriched_ticket_data_list = []
         if not basic_ticket_data_list:
             log_message("No tickets found in the initial list fetch for the given criteria.")
         else:
             log_message(f"Fetched {len(basic_ticket_data_list)} basic ticket entries. Now fetching details and filtering for Incidents...")
-
             for i, basic_ticket in enumerate(basic_ticket_data_list):
                 ticket_id = basic_ticket.get('id')
                 if not ticket_id:
                     log_message(f"Skipping basic ticket data without ID: {basic_ticket}", is_error=True)
                     continue
 
-                # log_message(f"Processing ticket {i+1}/{len(basic_ticket_data_list)}: ID {ticket_id}") # Can be verbose
                 detailed_ticket = get_ticket_details_with_stats(ticket_id, BASE_URL, headers)
-
                 if detailed_ticket:
-                    # *** MODIFICATION: Check type before adding to enriched list ***
                     ticket_type = detailed_ticket.get('type')
                     if ticket_type == "Incident":
                         enriched_ticket_data_list.append(detailed_ticket)
-                    # else: # Optional: log if you skip non-incidents after detail fetch
-                        # log_message(f"Ticket ID {ticket_id} is type '{ticket_type}', not 'Incident'. Skipping from final list.")
                 else:
                     log_message(f"Failed to fetch details for ticket ID {ticket_id}. It will be excluded.", is_error=True)
 
-                if i < len(basic_ticket_data_list) - 1: # Don't sleep after the last one
+                if i < len(basic_ticket_data_list) - 1:
                     time.sleep(DELAY_BETWEEN_DETAIL_FETCHES)
-
             log_message(f"After detail fetch and type filtering, {len(enriched_ticket_data_list)} 'Incident' tickets remain for processing.")
 
-        # Now, enriched_ticket_data_list contains only 'Incident' type tickets with full details
         api_incident_ticket_ids = set()
         if enriched_ticket_data_list:
             for ticket_data in enriched_ticket_data_list:
@@ -350,19 +326,14 @@ def main_loop():
         local_ticket_ids_before_processing = get_local_ticket_ids(TICKETS_DIR)
         log_message(f"State: {len(local_ticket_ids_before_processing)} local files, {len(api_incident_ticket_ids)} FreshService 'Incident' tickets active.")
 
-        # Write files for active 'Incident' tickets
         active_files_written_count = 0
         if enriched_ticket_data_list:
-            for ticket_data in enriched_ticket_data_list: # This list now only contains Incidents
-                # Double check type just in case, though it should be filtered already
+            for ticket_data in enriched_ticket_data_list:
                 if isinstance(ticket_data, dict) and 'id' in ticket_data and ticket_data.get('type') == "Incident":
                     write_ticket_file(ticket_data)
                     active_files_written_count +=1
         log_message(f"Wrote/updated {active_files_written_count} 'Incident' ticket files in '{TICKETS_DIR}'.")
 
-        # Archive local files that are no longer in the active 'Incident' list from FreshService
-        # This means if a ticket changes type from Incident to Service Request, or is closed/deleted,
-        # its local 'Incident' file will be archived.
         closed_or_missing_incident_ids = local_ticket_ids_before_processing - api_incident_ticket_ids
         num_tickets_archived_this_cycle = 0
         if closed_or_missing_incident_ids:
@@ -374,7 +345,6 @@ def main_loop():
             log_message("No local ticket files to archive in this cycle.")
 
         newly_added_incident_ids = api_incident_ticket_ids - local_ticket_ids_before_processing
-
         log_message(f"Changes: {len(newly_added_incident_ids)} new 'Incident' tickets processed, {num_tickets_archived_this_cycle} old/non-Incident files archived.")
 
         cycle_duration = time.time() - current_cycle_start_time
@@ -387,46 +357,40 @@ def main_loop():
         else:
             log_message("Warning: Poll cycle took longer than POLL_INTERVAL. Running next cycle immediately.", is_error=True)
 
-
 if __name__ == '__main__':
-    # Lock file mechanism to prevent multiple instances
-    # Ensure LOCK_FILE path is absolute or correctly relative to script location
-    script_dir_for_lock = os.path.dirname(os.path.abspath(__file__))
-    lock_file_path = os.path.join(script_dir_for_lock, LOCK_FILE)
+    # Removed lock file mechanism. Systemd will manage singleton execution.
+    # script_dir_for_lock = os.path.dirname(os.path.abspath(__file__))
+    # lock_file_path = os.path.join(script_dir_for_lock, LOCK_FILE)
 
-    if os.path.exists(lock_file_path):
-        try:
-            with open(lock_file_path, 'r') as lf:
-                pid_str = lf.read().strip()
-                if pid_str:
-                    # Simple check: if PID file exists and is not empty.
-                    # For robust check, one would need to see if process with PID is actually running.
-                    # This requires OS-specific commands or a library like psutil.
-                    log_message(f"Lock file '{lock_file_path}' exists (PID: {pid_str}). Another instance might be running. Exiting.", is_error=True)
-                    sys.exit(1) # Exit if lock file suggests another instance
-                else: # Lock file exists but is empty
-                    log_message(f"Lock file '{lock_file_path}' exists but is empty. Overwriting.", is_error=True)
-        except ValueError: # If PID in lock file is not an int
-            log_message(f"Lock file '{lock_file_path}' exists but contains invalid PID. Overwriting.", is_error=True)
-        except Exception as e: # Catch any other errors reading lock file
-            log_message(f"Error checking lock file '{lock_file_path}': {e}. Assuming another instance is running. Exiting.", is_error=True)
-            sys.exit(1)
+    # if os.path.exists(lock_file_path):
+    #     try:
+    #         with open(lock_file_path, 'r') as lf:
+    #             pid_str = lf.read().strip()
+    #             if pid_str:
+    #                 log_message(f"Lock file '{lock_file_path}' exists (PID: {pid_str}). Another instance might be running. Exiting.", is_error=True)
+    #                 sys.exit(1)
+    #             else: # Lock file exists but is empty
+    #                 log_message(f"Lock file '{lock_file_path}' exists but is empty. Assuming stale and proceeding.", is_error=True) # Changed behavior
+    #     except ValueError:
+    #         log_message(f"Lock file '{lock_file_path}' exists but contains invalid PID. Assuming stale and proceeding.", is_error=True) # Changed behavior
+    #     except Exception as e:
+    #         log_message(f"Error checking lock file '{lock_file_path}': {e}. Assuming stale and proceeding.", is_error=True) # Changed behavior
+            # sys.exit(1) # Original exit removed
 
     try:
-        with open(lock_file_path, 'w') as lf:
-            lf.write(str(os.getpid()))
+        # with open(lock_file_path, 'w') as lf: # Removed lock file creation
+        #     lf.write(str(os.getpid()))
         main_loop()
     except KeyboardInterrupt:
         log_message("Poller interrupted by user (Ctrl+C). Exiting gracefully.")
     except Exception as e:
         log_message(f"Unhandled exception in main_loop: {e}", is_error=True)
-        # Optionally re-raise or log traceback for more details
         # import traceback
         # log_message(traceback.format_exc(), is_error=True)
-    finally:
-        if os.path.exists(lock_file_path):
-            try:
-                os.remove(lock_file_path)
-                log_message(f"Lock file '{lock_file_path}' removed.")
-            except Exception as e:
-                log_message(f"Error removing lock file '{lock_file_path}': {e}", is_error=True)
+    # finally: # Removed lock file cleanup from script
+        # if os.path.exists(lock_file_path):
+        #     try:
+        #         os.remove(lock_file_path)
+        #         log_message(f"Lock file '{lock_file_path}' removed.")
+        #     except Exception as e:
+        #         log_message(f"Error removing lock file '{lock_file_path}': {e}", is_error=True)
