@@ -1,19 +1,22 @@
 [Unit]
 Description=Ticket Watcher Service for Ticket Dash
-After=network.target # Ensures network is up before starting
+# Ensures network is up before starting
+After=network.target
 
 [Service]
-User=ticketdashuser
-Group=www-data # Or the primary group of ticketdashuser
+User=integotec
+Group=integotec # Assuming 'integotec' is also the group
 WorkingDirectory=/home/integotec/ticket-dash
 
 # Command to start the ticket_watcher.py script
 # Ensure 'python3' is the correct interpreter and can find necessary libraries (e.g., requests)
+# If using a virtualenv: /home/integotec/ticket-dash/pyenv/bin/python3
 ExecStart=/usr/bin/python3 /home/integotec/ticket-dash/ticket_watcher.py
 
 # Restart policy
 Restart=always
-RestartSec=30 # Wait 30 seconds before restarting, as this script polls periodically
+# Wait 30 seconds before restarting, as this script polls periodically
+RestartSec=30
 
 # Standard output and error logging
 StandardOutput=journal
@@ -24,9 +27,10 @@ PrivateTmp=true
 ProtectSystem=full
 NoNewPrivileges=true
 # The script writes to ./tickets, ./ticket_poller.log, and ./ticket_poller.lock
-# These will be relative to WorkingDirectory. Ensure ticketdashuser has write permissions
-# to /home/integotec/ticket-dash/
+# and reads ./token.txt
+# These will be relative to WorkingDirectory. Ensure integotec has write permissions.
 ReadWritePaths=/home/integotec/ticket-dash/tickets /home/integotec/ticket-dash/ticket_poller.log /home/integotec/ticket-dash/ticket_poller.lock
+ReadOnlyPaths=/home/integotec/ticket-dash/token.txt
 
 [Install]
 WantedBy=multi-user.target

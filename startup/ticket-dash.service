@@ -7,11 +7,12 @@ After=network.target
 # After=network.target ticket-watcher.service
 
 [Service]
-User=integotec                           # Replace with your desired non-root user
-Group=www-data                                # Or the group of ticketdashuser
-WorkingDirectory=/home/integotec/ticket-dash             # Replace with the actual path to your app
+User=integotec
+Group=integotec # Assuming 'integotec' is also the group
+WorkingDirectory=/home/integotec/ticket-dash
 
 # The command to start your application
+# If using a virtualenv: /usr/bin/authbind --deep /home/integotec/ticket-dash/pyenv/bin/python3 /home/integotec/ticket-dash/gui.py
 ExecStart=/usr/bin/authbind --deep python3 /home/integotec/ticket-dash/gui.py
 
 # Restart policy
@@ -26,11 +27,11 @@ StandardError=journal
 PrivateTmp=true
 ProtectSystem=full
 NoNewPrivileges=true
-# If your app needs to write to specific directories (other than TICKETS_DIR if it's relative to WorkingDirectory)
-# you might need to adjust ProtectSystem or use ReadWritePaths.
-# For example, if TICKETS_DIR is /var/ticket-dash-data:
-# ReadWritePaths=/var/ticket-dash-data
-# Your gui.py currently uses "./tickets", so it would write to /srv/ticket-dash/tickets
+# Your gui.py currently uses "./tickets", so it would write to /home/integotec/ticket-dash/tickets
+# It also reads cert.pem, key.pem, agents.txt, requesters.txt from the WorkingDirectory.
+# It reads from ./tickets
+ReadWritePaths=/home/integotec/ticket-dash/tickets
+ReadOnlyPaths=/home/integotec/ticket-dash/cert.pem /home/integotec/ticket-dash/key.pem /home/integotec/ticket-dash/agents.txt /home/integotec/ticket-dash/requesters.txt /home/integotec/ticket-dash/token.txt
 
 [Install]
 WantedBy=multi-user.target
