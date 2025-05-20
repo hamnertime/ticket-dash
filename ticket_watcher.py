@@ -25,7 +25,7 @@ DELAY_BETWEEN_DETAIL_FETCHES = 0.75
 
 TICKETS_DIR = "./tickets"
 ARCHIVE_DIR_BASE = os.path.join(TICKETS_DIR, "archive")
-POLL_INTERVAL = 30 # seconds
+POLL_INTERVAL = 120 # MODIFIED: Increased polling interval to 120 seconds (2 minutes)
 LOG_FILE = "./ticket_poller.log"
 
 # --- Logging Function ---
@@ -127,16 +127,14 @@ def archive_ticket_file(ticket_id):
 
 
 # --- Fetch Filtered Ticket List (Step 1) ---
-# This function now only filters by status in the API query. Type filtering happens later.
 def get_filtered_ticket_list(base_url, headers, status_ids):
     all_basic_tickets = []
     page = 1
     filter_endpoint = f"{base_url}/api/v2/tickets/filter"
     fetched_ids_current_run = set()
 
-    # Query only by status
     status_queries = [f"status:{status_id}" for status_id in status_ids]
-    raw_query_value = f"({' OR '.join(status_queries)})" # No AND for type here
+    raw_query_value = f"({' OR '.join(status_queries)})"
     query_param_value = f'"{raw_query_value}"'
 
     log_message(f"Fetching filtered ticket list by status. Query: {query_param_value}")
@@ -162,7 +160,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
                         log_message(f"List fetch rate limit exceeded after {MAX_RETRIES} retries.", is_error=True)
                         return None
 
-                if response.status_code == 400: # Should be less likely now with simpler query
+                if response.status_code == 400:
                     err_details = response.json() if response.content and 'application/json' in response.headers.get('Content-Type','') else response.text
                     log_message(f"400 Bad Request for list. URL: {response.url}. Details: {err_details}", is_error=True)
                     return None
@@ -179,7 +177,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
                 for ticket_data in current_page_tickets:
                     if isinstance(ticket_data, dict) and ticket_data.get('id') and ticket_data.get('id') not in fetched_ids_current_run:
                         fetched_ids_current_run.add(ticket_data['id'])
-                        all_basic_tickets.append(ticket_data) # Add all tickets matching status
+                        all_basic_tickets.append(ticket_data)
                         new_on_page +=1
                 log_message(f"List Page {page}: Fetched {len(current_page_tickets)} items (by status), {new_on_page} new unique. Total basic: {len(all_basic_tickets)}")
 
@@ -263,7 +261,7 @@ def main_loop():
     log_message(f"Tickets directory: '{TICKETS_DIR}'")
     log_message(f"Archive directory base: '{ARCHIVE_DIR_BASE}'")
     log_message(f"Fetching tickets with status IDs: {STATUS_IDS_TO_INCLUDE}")
-    log_message(f"Will locally filter for types: {TYPES_TO_INCLUDE}") # Clarified logging
+    log_message(f"Will locally filter for types: {TYPES_TO_INCLUDE}")
     log_message(f"Max pages per API list fetch: {MAX_PAGES}, Tickets per page: {TICKETS_PER_PAGE}")
     log_message(f"Delay between individual ticket detail fetches: {DELAY_BETWEEN_DETAIL_FETCHES}s")
 
@@ -284,7 +282,6 @@ def main_loop():
         current_cycle_start_time = time.time()
         log_message("--- Poll Cycle Start ---")
 
-        # Fetch all tickets matching the status IDs
         basic_ticket_data_list = get_filtered_ticket_list(
             BASE_URL, headers, STATUS_IDS_TO_INCLUDE
         )
@@ -309,11 +306,9 @@ def main_loop():
 
                 detailed_ticket = get_ticket_details_with_stats(ticket_id, BASE_URL, headers)
                 if detailed_ticket:
-                    ticket_type = detailed_ticket.get('type') # Get type from detailed ticket data
-                    if ticket_type in TYPES_TO_INCLUDE: # Local filtering by type
+                    ticket_type = detailed_ticket.get('type')
+                    if ticket_type in TYPES_TO_INCLUDE:
                         enriched_ticket_data_list.append(detailed_ticket)
-                    # else:
-                        # log_message(f"Ticket ID {ticket_id} (Type: {ticket_type}) not in TYPES_TO_INCLUDE. Skipping.")
                 else:
                     log_message(f"Failed to fetch details for ticket ID {ticket_id}. It will be excluded.", is_error=True)
 
