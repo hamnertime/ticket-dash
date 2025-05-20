@@ -12,7 +12,7 @@ TOKEN_FILE = "./token.txt"
 FRESHSERVICE_DOMAIN = "integotecllc.freshservice.com"
 BASE_URL = f"https://{FRESHSERVICE_DOMAIN}"
 STATUS_IDS_TO_INCLUDE = [2, 3, 8, 9, 10, 13, 23, 26] # Statuses to fetch initially
-TYPES_TO_INCLUDE = ["Incident", "Service Request"] # MODIFIED: Specify types to include
+TYPES_TO_INCLUDE = ["Incident", "Service Request"]
 ORDER_BY_FIELD = "updated_at"
 ORDER_TYPE = "desc"
 TICKETS_PER_PAGE = 30
@@ -134,12 +134,11 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
     fetched_ids_current_run = set()
 
     status_queries = [f"status:{status_id}" for status_id in status_ids]
-    # Create a query that includes any of the specified types
-    type_queries = [f"ticket_type:'{ticket_type}'" for ticket_type in TYPES_TO_INCLUDE]
+    # CORRECTED: Use "type" instead of "ticket_type" for the API query field
+    type_queries = [f"type:'{ticket_type}'" for ticket_type in TYPES_TO_INCLUDE]
 
-    # Combine status and type queries: (status:A OR status:B) AND (type:X OR type:Y)
     raw_query_value = f"({' OR '.join(status_queries)}) AND ({' OR '.join(type_queries)})"
-    query_param_value = f'"{raw_query_value}"'
+    query_param_value = f'"{raw_query_value}"' # Ensure the whole query is enclosed in double quotes for the API
 
     log_message(f"Fetching filtered ticket list. Query: {query_param_value}")
 
@@ -152,7 +151,12 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
         retries = 0
         while retries <= MAX_RETRIES:
             try:
+                # Log the full URL for debugging
+                # prepared_request = requests.Request('GET', filter_endpoint, params=params).prepare()
+                # log_message(f"Requesting URL: {prepared_request.url}")
+
                 response = requests.get(filter_endpoint, headers=headers, params=params, timeout=30)
+
                 if response.status_code == 429:
                     if retries < MAX_RETRIES:
                         retry_after = int(response.headers.get('Retry-After', RETRY_DELAY))
@@ -189,7 +193,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
                     return all_basic_tickets
 
                 page += 1
-                break
+                break # Break from retries loop to go to next page
 
             except requests.exceptions.Timeout:
                 log_message(f"Timeout on list fetch, page {page}. Retry {retries+1}/{MAX_RETRIES}...", is_error=True)
@@ -201,9 +205,12 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
                 time.sleep(RETRY_DELAY)
             else:
                 log_message(f"Failed list fetch for page {page} after {MAX_RETRIES} retries.", is_error=True)
-                return None
+                return None # Failed for this page after retries
+
+        # If loop was exited due to max retries for a page, and not all pages are done
         if retries > MAX_RETRIES and page <= MAX_PAGES :
-             return None
+             log_message(f"Giving up on page {page} due to repeated errors.")
+             return None # Indicate overall failure if a page cannot be fetched
 
     if page > MAX_PAGES:
         log_message(f"Warning: List fetch reached MAX_PAGES ({MAX_PAGES}). Some tickets might be missed if total > {MAX_PAGES * TICKETS_PER_PAGE * len(TYPES_TO_INCLUDE)}.", is_error=True)
@@ -212,7 +219,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
 # --- Fetch Single Ticket Details with Stats (Step 2) ---
 def get_ticket_details_with_stats(ticket_id, base_url, headers):
     detail_endpoint = f"{base_url}/api/v2/tickets/{ticket_id}"
-    params = {'include': 'stats'}
+    params = {'include': 'stats'} # Include stats for FR due date, etc.
     retries = 0
 
     while retries <= MAX_RETRIES:
@@ -231,31 +238,34 @@ def get_ticket_details_with_stats(ticket_id, base_url, headers):
 
             if response.status_code == 404:
                 log_message(f"Ticket {ticket_id} not found (404). Might have been deleted since list fetch.", is_error=True)
-                return None
+                return None # Ticket doesn't exist, move on
 
-            response.raise_for_status()
+            response.raise_for_status() # For other HTTP errors
             response_json = response.json()
+            # The main ticket data is usually under a "ticket" key in Freshservice v2
             if "ticket" in response_json:
                 return response_json["ticket"]
             else:
+                # If "ticket" key is missing, it might be an error or unexpected structure
                 log_message(f"Unexpected response structure for ticket {ticket_id} details (missing 'ticket' key): {response_json}", is_error=True)
-                return response_json
+                return response_json # Or return None if this structure is definitely unusable
 
         except requests.exceptions.Timeout:
             log_message(f"Timeout fetching details for ticket {ticket_id}. Retry {retries+1}/{MAX_RETRIES}...", is_error=True)
         except requests.exceptions.RequestException as e:
             log_message(f"Request Exception for ticket {ticket_id} details: {e}. Retry {retries+1}/{MAX_RETRIES}...", is_error=True)
         except json.JSONDecodeError:
-            log_message(f"JSON decode error for ticket {ticket_id} details. Response: {response.text[:200]}", is_error=True)
-            return None
+            log_message(f"JSON decode error for ticket {ticket_id} details. Response: {response.text[:200]}", is_error=True) # Log part of response
+            return None # Can't parse JSON
 
         retries += 1
         if retries <= MAX_RETRIES:
-            time.sleep(INDIVIDUAL_TICKET_RETRY_DELAY)
+            time.sleep(INDIVIDUAL_TICKET_RETRY_DELAY) # Wait before retrying this specific ticket
         else:
             log_message(f"Failed to fetch details for ticket {ticket_id} after {MAX_RETRIES} retries.", is_error=True)
-            return None
-    return None
+            return None # Give up on this ticket after max retries
+    return None # Should be unreachable if loop logic is correct, but as a fallback
+
 
 # --- Main Background Process Loop ---
 def main_loop():
@@ -264,7 +274,7 @@ def main_loop():
     log_message(f"Tickets directory: '{TICKETS_DIR}'")
     log_message(f"Archive directory base: '{ARCHIVE_DIR_BASE}'")
     log_message(f"Fetching tickets with status IDs: {STATUS_IDS_TO_INCLUDE}")
-    log_message(f"Fetching tickets with types: {TYPES_TO_INCLUDE}") # MODIFIED Log
+    log_message(f"Fetching tickets with types: {TYPES_TO_INCLUDE}")
     log_message(f"Max pages per API list fetch: {MAX_PAGES}, Tickets per page: {TICKETS_PER_PAGE}")
     log_message(f"Delay between individual ticket detail fetches: {DELAY_BETWEEN_DETAIL_FETCHES}s")
 
@@ -289,13 +299,16 @@ def main_loop():
             BASE_URL, headers, STATUS_IDS_TO_INCLUDE
         )
 
-        if basic_ticket_data_list is None:
+        if basic_ticket_data_list is None: # Check for None, which indicates a failure in fetching the list
             log_message("API fetch for ticket list failed. Retrying next cycle.", is_error=True)
-            time.sleep(POLL_INTERVAL)
+            # Calculate sleep time carefully if the cycle was short due to immediate failure
+            cycle_duration = time.time() - current_cycle_start_time
+            sleep_duration = max(0, POLL_INTERVAL - cycle_duration)
+            if sleep_duration > 0: time.sleep(sleep_duration)
             continue
 
         enriched_ticket_data_list = []
-        if not basic_ticket_data_list:
+        if not basic_ticket_data_list: # Empty list means no tickets matched, not necessarily an error
             log_message("No tickets found in the initial list fetch for the given criteria.")
         else:
             log_message(f"Fetched {len(basic_ticket_data_list)} basic ticket entries. Now fetching details and filtering for specified types: {TYPES_TO_INCLUDE}...")
@@ -305,39 +318,47 @@ def main_loop():
                     log_message(f"Skipping basic ticket data without ID: {basic_ticket}", is_error=True)
                     continue
 
+                # It's good practice to check the type from the basic list if available,
+                # though the main filtering by type happens after getting details.
+                # basic_ticket_type = basic_ticket.get('type') # Freshservice /filter often doesn't return type in basic list
+                # if basic_ticket_type and basic_ticket_type not in TYPES_TO_INCLUDE:
+                #    log_message(f"Skipping detail fetch for ticket ID {ticket_id} of type '{basic_ticket_type}' (not in TYPES_TO_INCLUDE).")
+                #    continue
+
+
                 detailed_ticket = get_ticket_details_with_stats(ticket_id, BASE_URL, headers)
                 if detailed_ticket:
-                    ticket_type = detailed_ticket.get('type')
-                    if ticket_type in TYPES_TO_INCLUDE: # MODIFIED: Filter by TYPES_TO_INCLUDE
+                    ticket_type = detailed_ticket.get('type') # Get type from detailed ticket data
+                    if ticket_type in TYPES_TO_INCLUDE:
                         enriched_ticket_data_list.append(detailed_ticket)
-                    # else: # Optional: Log if a ticket of an unexpected type was fetched by the initial broad query
-                        # log_message(f"Ticket ID {ticket_id} is of type '{ticket_type}', which is not in TYPES_TO_INCLUDE. Skipping.")
+                    # else: # This case should be rare if the main filter query is correct, but good for robustness
+                        # log_message(f"Ticket ID {ticket_id} is of type '{ticket_type}', which was not expected or not in TYPES_TO_INCLUDE after detail fetch. Skipping.")
                 else:
                     log_message(f"Failed to fetch details for ticket ID {ticket_id}. It will be excluded.", is_error=True)
 
-                if i < len(basic_ticket_data_list) - 1:
+                if i < len(basic_ticket_data_list) - 1: # Avoid sleep after the last item
                     time.sleep(DELAY_BETWEEN_DETAIL_FETCHES)
             log_message(f"After detail fetch and type filtering, {len(enriched_ticket_data_list)} tickets of types '{', '.join(TYPES_TO_INCLUDE)}' remain for processing.")
 
         api_ticket_ids_for_processing = set()
-        if enriched_ticket_data_list:
+        if enriched_ticket_data_list: # Ensure list is not None
             for ticket_data in enriched_ticket_data_list:
                 if isinstance(ticket_data, dict) and 'id' in ticket_data:
                      api_ticket_ids_for_processing.add(ticket_data['id'])
-        log_message(f"API returned {len(api_ticket_ids_for_processing)} unique ticket IDs for processing this cycle.")
+        log_message(f"API returned {len(api_ticket_ids_for_processing)} unique ticket IDs for processing this cycle (Types: {', '.join(TYPES_TO_INCLUDE)}).")
+
 
         local_ticket_ids_before_processing = get_local_ticket_ids(TICKETS_DIR)
         log_message(f"State: {len(local_ticket_ids_before_processing)} local files, {len(api_ticket_ids_for_processing)} FreshService tickets of specified types are active.")
 
         active_files_written_count = 0
         if enriched_ticket_data_list:
-            for ticket_data in enriched_ticket_data_list: # Iterate through the enriched list which is already filtered by type
-                if isinstance(ticket_data, dict) and 'id' in ticket_data: # Redundant type check removed, already filtered
+            for ticket_data in enriched_ticket_data_list:
+                if isinstance(ticket_data, dict) and 'id' in ticket_data:
                     write_ticket_file(ticket_data)
                     active_files_written_count +=1
         log_message(f"Wrote/updated {active_files_written_count} ticket files (types: {', '.join(TYPES_TO_INCLUDE)}) in '{TICKETS_DIR}'.")
 
-        # Files to archive are those present locally but NOT in the current list of active tickets (of specified types) from API
         closed_or_missing_ticket_ids = local_ticket_ids_before_processing - api_ticket_ids_for_processing
         num_tickets_archived_this_cycle = 0
         if closed_or_missing_ticket_ids:
@@ -359,7 +380,7 @@ def main_loop():
             log_message(f"Sleeping for {sleep_duration:.2f} seconds...")
             time.sleep(sleep_duration)
         else:
-            log_message("Warning: Poll cycle took longer than POLL_INTERVAL. Running next cycle immediately.", is_error=True)
+            log_message(f"Warning: Poll cycle took longer than POLL_INTERVAL ({POLL_INTERVAL}s). Running next cycle immediately.", is_error=True)
 
 if __name__ == '__main__':
     try:
@@ -368,3 +389,5 @@ if __name__ == '__main__':
         log_message("Poller interrupted by user (Ctrl+C). Exiting gracefully.")
     except Exception as e:
         log_message(f"Unhandled exception in main_loop: {e}", is_error=True)
+        import traceback
+        log_message(traceback.format_exc(), is_error=True)
