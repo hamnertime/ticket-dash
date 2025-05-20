@@ -12,7 +12,8 @@ TOKEN_FILE = "./token.txt"
 FRESHSERVICE_DOMAIN = "integotecllc.freshservice.com"
 BASE_URL = f"https://{FRESHSERVICE_DOMAIN}"
 STATUS_IDS_TO_INCLUDE = [2, 3, 8, 9, 10, 13, 23, 26] # Statuses to fetch initially
-TYPES_TO_INCLUDE = ["Incident", "Service Request"] # We will filter by these locally
+TYPES_TO_INCLUDE = ["Incident", "Service Request"] # Define types to process
+
 ORDER_BY_FIELD = "updated_at" # Not directly used by /api/v2/tickets/filter, but good for reference
 ORDER_TYPE = "desc" # Not directly used by /api/v2/tickets/filter
 TICKETS_PER_PAGE = 30
@@ -25,7 +26,7 @@ DELAY_BETWEEN_DETAIL_FETCHES = 0.75
 
 TICKETS_DIR = "./tickets"
 ARCHIVE_DIR_BASE = os.path.join(TICKETS_DIR, "archive")
-POLL_INTERVAL = 120 # MODIFIED: Increased polling interval to 120 seconds (2 minutes)
+POLL_INTERVAL = 120 # MODIFIED: Adjusted polling interval
 LOG_FILE = "./ticket_poller.log"
 
 # --- Logging Function ---
@@ -127,7 +128,8 @@ def archive_ticket_file(ticket_id):
 
 
 # --- Fetch Filtered Ticket List (Step 1) ---
-def get_filtered_ticket_list(base_url, headers, status_ids):
+# API Query only filters by status. Type filtering happens after detail fetch.
+def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type):
     all_basic_tickets = []
     page = 1
     filter_endpoint = f"{base_url}/api/v2/tickets/filter"
@@ -137,7 +139,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
     raw_query_value = f"({' OR '.join(status_queries)})"
     query_param_value = f'"{raw_query_value}"'
 
-    log_message(f"Fetching filtered ticket list by status. Query: {query_param_value}")
+    log_message(f"Fetching filtered ticket list. Query: {query_param_value}")
 
     while page <= MAX_PAGES:
         params = {
@@ -179,7 +181,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
                         fetched_ids_current_run.add(ticket_data['id'])
                         all_basic_tickets.append(ticket_data)
                         new_on_page +=1
-                log_message(f"List Page {page}: Fetched {len(current_page_tickets)} items (by status), {new_on_page} new unique. Total basic: {len(all_basic_tickets)}")
+                log_message(f"List Page {page}: Fetched {len(current_page_tickets)} items, {new_on_page} new unique. Total basic: {len(all_basic_tickets)}")
 
                 if len(current_page_tickets) < TICKETS_PER_PAGE:
                     return all_basic_tickets
@@ -199,7 +201,6 @@ def get_filtered_ticket_list(base_url, headers, status_ids):
                 log_message(f"Failed list fetch for page {page} after {MAX_RETRIES} retries.", is_error=True)
                 return None
         if retries > MAX_RETRIES and page <= MAX_PAGES :
-             log_message(f"Giving up on page {page} due to repeated errors.")
              return None
 
     if page > MAX_PAGES:
@@ -261,10 +262,9 @@ def main_loop():
     log_message(f"Tickets directory: '{TICKETS_DIR}'")
     log_message(f"Archive directory base: '{ARCHIVE_DIR_BASE}'")
     log_message(f"Fetching tickets with status IDs: {STATUS_IDS_TO_INCLUDE}")
-    log_message(f"Will locally filter for types: {TYPES_TO_INCLUDE}")
     log_message(f"Max pages per API list fetch: {MAX_PAGES}, Tickets per page: {TICKETS_PER_PAGE}")
     log_message(f"Delay between individual ticket detail fetches: {DELAY_BETWEEN_DETAIL_FETCHES}s")
-
+    log_message(f"Creating local files for tickets of types: {TYPES_TO_INCLUDE}") # MODIFIED Log
 
     ensure_directories()
     API_KEY = read_api_key(TOKEN_FILE)
@@ -283,21 +283,22 @@ def main_loop():
         log_message("--- Poll Cycle Start ---")
 
         basic_ticket_data_list = get_filtered_ticket_list(
-            BASE_URL, headers, STATUS_IDS_TO_INCLUDE
+            BASE_URL, headers, STATUS_IDS_TO_INCLUDE, ORDER_BY_FIELD, ORDER_TYPE
         )
 
         if basic_ticket_data_list is None:
             log_message("API fetch for ticket list failed. Retrying next cycle.", is_error=True)
+            # Calculate sleep time carefully if the cycle was short due to immediate failure
             cycle_duration = time.time() - current_cycle_start_time
             sleep_duration = max(0, POLL_INTERVAL - cycle_duration)
             if sleep_duration > 0: time.sleep(sleep_duration)
             continue
 
-        enriched_ticket_data_list = []
+        processed_ticket_data_list = [] # Renamed from enriched_ticket_data_list for clarity
         if not basic_ticket_data_list:
-            log_message("No tickets found in the initial list fetch for the given statuses.")
+            log_message("No tickets found in the initial list fetch for the given criteria.")
         else:
-            log_message(f"Fetched {len(basic_ticket_data_list)} basic ticket entries by status. Now fetching details and filtering for types: {TYPES_TO_INCLUDE}...")
+            log_message(f"Fetched {len(basic_ticket_data_list)} basic ticket entries. Now fetching details and filtering for types: {TYPES_TO_INCLUDE}...")
             for i, basic_ticket in enumerate(basic_ticket_data_list):
                 ticket_id = basic_ticket.get('id')
                 if not ticket_id:
@@ -307,45 +308,50 @@ def main_loop():
                 detailed_ticket = get_ticket_details_with_stats(ticket_id, BASE_URL, headers)
                 if detailed_ticket:
                     ticket_type = detailed_ticket.get('type')
+                    # MODIFIED: Filter to include types from TYPES_TO_INCLUDE list
                     if ticket_type in TYPES_TO_INCLUDE:
-                        enriched_ticket_data_list.append(detailed_ticket)
+                        processed_ticket_data_list.append(detailed_ticket)
+                    # else:
+                        # log_message(f"Ticket ID {ticket_id} (Type: {ticket_type}) is not in TYPES_TO_INCLUDE. Skipping.")
                 else:
                     log_message(f"Failed to fetch details for ticket ID {ticket_id}. It will be excluded.", is_error=True)
 
                 if i < len(basic_ticket_data_list) - 1:
                     time.sleep(DELAY_BETWEEN_DETAIL_FETCHES)
-            log_message(f"After detail fetch and local type filtering, {len(enriched_ticket_data_list)} tickets of types '{', '.join(TYPES_TO_INCLUDE)}' remain for processing.")
+            log_message(f"After detail fetch and type filtering, {len(processed_ticket_data_list)} tickets of types {TYPES_TO_INCLUDE} remain for processing.")
 
-        api_ticket_ids_for_processing = set()
-        if enriched_ticket_data_list:
-            for ticket_data in enriched_ticket_data_list:
+        api_ticket_ids_for_saving = set() # Renamed for clarity
+        if processed_ticket_data_list:
+            for ticket_data in processed_ticket_data_list:
                 if isinstance(ticket_data, dict) and 'id' in ticket_data:
-                     api_ticket_ids_for_processing.add(ticket_data['id'])
-        log_message(f"API returned {len(api_ticket_ids_for_processing)} unique ticket IDs for processing this cycle (Types: {', '.join(TYPES_TO_INCLUDE)}).")
+                     api_ticket_ids_for_saving.add(ticket_data['id'])
+        log_message(f"API returned {len(api_ticket_ids_for_saving)} unique ticket IDs of specified types this cycle.")
 
         local_ticket_ids_before_processing = get_local_ticket_ids(TICKETS_DIR)
-        log_message(f"State: {len(local_ticket_ids_before_processing)} local files, {len(api_ticket_ids_for_processing)} FreshService tickets of specified types are active.")
+        log_message(f"State: {len(local_ticket_ids_before_processing)} local files, {len(api_ticket_ids_for_saving)} FreshService tickets of specified types are active.")
 
         active_files_written_count = 0
-        if enriched_ticket_data_list:
-            for ticket_data in enriched_ticket_data_list:
+        if processed_ticket_data_list:
+            for ticket_data in processed_ticket_data_list: # Iterate through the already filtered list
+                # The check `ticket_data.get('type') in TYPES_TO_INCLUDE` is redundant here as it's already filtered
                 if isinstance(ticket_data, dict) and 'id' in ticket_data:
                     write_ticket_file(ticket_data)
                     active_files_written_count +=1
-        log_message(f"Wrote/updated {active_files_written_count} ticket files (types: {', '.join(TYPES_TO_INCLUDE)}) in '{TICKETS_DIR}'.")
+        log_message(f"Wrote/updated {active_files_written_count} ticket files for types {TYPES_TO_INCLUDE} in '{TICKETS_DIR}'.")
 
-        closed_or_missing_ticket_ids = local_ticket_ids_before_processing - api_ticket_ids_for_processing
+        # Files to archive are those present locally but NOT in the current list of active tickets (of specified types) from API
+        closed_or_missing_ids = local_ticket_ids_before_processing - api_ticket_ids_for_saving
         num_tickets_archived_this_cycle = 0
-        if closed_or_missing_ticket_ids:
-            log_message(f"Found {len(closed_or_missing_ticket_ids)} local files to archive (no longer active or not of specified types): {closed_or_missing_ticket_ids}")
-            for ticket_id_to_archive in closed_or_missing_ticket_ids:
+        if closed_or_missing_ids:
+            log_message(f"Found {len(closed_or_missing_ids)} local files to archive (no longer active or not of specified types): {closed_or_missing_ids}")
+            for ticket_id_to_archive in closed_or_missing_ids:
                 archive_ticket_file(ticket_id_to_archive)
                 num_tickets_archived_this_cycle += 1
         else:
             log_message("No local ticket files to archive in this cycle.")
 
-        newly_added_ticket_ids = api_ticket_ids_for_processing - local_ticket_ids_before_processing
-        log_message(f"Changes: {len(newly_added_ticket_ids)} new tickets processed, {num_tickets_archived_this_cycle} old/non-specified-type files archived.")
+        newly_added_ids = api_ticket_ids_for_saving - local_ticket_ids_before_processing
+        log_message(f"Changes: {len(newly_added_ids)} new tickets processed, {num_tickets_archived_this_cycle} old/non-specified-type files archived.")
 
         cycle_duration = time.time() - current_cycle_start_time
         log_message(f"--- Poll cycle finished in {cycle_duration:.2f} seconds. ---")
