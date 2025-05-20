@@ -15,7 +15,7 @@
     --table-th-text: #c0c0ff;
     --table-row-even-bg: #28283c;
     --table-row-hover-bg: #353550;
-    --ticket-id-link: #82aaff; /* Kept as ticket-id-link for now, can be incident-id-link if preferred */
+    --item-id-link: #82aaff; /* Renamed from --ticket-id-link */
     --tooltip-bg: #181825;
     --tooltip-text: #e0e0ff;
     --sla-normal-text: #66bb6a;
@@ -32,6 +32,11 @@
     --theme-toggle-bg: var(--info-bar-bg);
     --theme-toggle-text: var(--body-text);
     --theme-toggle-border: var(--table-border);
+    --type-switch-button-bg: #353550;
+    --type-switch-button-text: #c0c0ff;
+    --type-switch-button-active-bg: #82aaff;
+    --type-switch-button-active-text: #1e1e2f;
+    --type-switch-button-hover-bg: #4a4a6a;
 }
 
 body.light-mode {
@@ -49,7 +54,7 @@ body.light-mode {
     --table-th-text: #495057;
     --table-row-even-bg: #f8f9fa;
     --table-row-hover-bg: #e2e6ea;
-    --ticket-id-link: #007bff;
+    --item-id-link: #007bff; /* Renamed */
     --tooltip-bg: #343a40;
     --tooltip-text: #ffffff;
     --sla-normal-text: #28a745;
@@ -60,12 +65,17 @@ body.light-mode {
     --sla-responded-text: #545b62;
     --sla-in-progress-text: #495057;
     --priority-low-text: #28a745;
-    --priority-medium-text: #e69500;
+    --priority-medium-text: #e69500; /* Adjusted for better contrast in light mode */
     --priority-high-text: #fd7e14;
     --priority-urgent-text: #dc3545;
     --theme-toggle-bg: var(--info-bar-bg);
     --theme-toggle-text: var(--body-text);
     --theme-toggle-border: var(--table-border);
+    --type-switch-button-bg: #d8dfe4;
+    --type-switch-button-text: #343a40;
+    --type-switch-button-active-bg: #007bff;
+    --type-switch-button-active-text: #ffffff;
+    --type-switch-button-hover-bg: #c6cfd6;
 }
 
 body {
@@ -74,7 +84,7 @@ body {
     color: var(--body-text);
     margin: 0;
     padding: 15px;
-    font-size: 18px;
+    font-size: 18px; /* Base size, can adjust with media queries */
     line-height: 1.6;
     transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -91,10 +101,43 @@ h1 { text-align: center; color: var(--h1-color); margin-bottom: 15px; font-size:
     border-radius: 6px;
     margin-bottom: 15px;
     font-size: 1.1em;
+    flex-wrap: wrap; /* Allow wrapping for smaller screens */
 }
+.info-bar > span { margin: 5px 10px; } /* Spacing for info bar items */
 .info-bar strong, .info-bar em {
-    color: var(--body-text);
+    color: var(--body-text); /* Ensure contrast */
 }
+
+/* Ticket Type Switcher Styles */
+.ticket-type-switcher {
+    display: flex;
+    align-items: center;
+    margin-right: 15px; /* Space between switcher and other info */
+}
+.ticket-type-switcher span {
+    margin-right: 8px;
+    font-weight: 500;
+}
+.type-switch-button {
+    background-color: var(--type-switch-button-bg);
+    color: var(--type-switch-button-text);
+    border: 1px solid var(--table-border);
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    margin-left: 5px;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.type-switch-button:hover {
+    background-color: var(--type-switch-button-hover-bg);
+}
+.type-switch-button.active {
+    background-color: var(--type-switch-button-active-bg);
+    color: var(--type-switch-button-active-text);
+    font-weight: bold;
+}
+
 
 #theme-toggle {
 background-color: var(--theme-toggle-bg);
@@ -105,6 +148,7 @@ border-radius: 5px;
 cursor: pointer;
 font-size: 0.95em;
 transition: background-color 0.2s ease, color 0.2s ease;
+margin-left: auto; /* Push to the right if space allows */
 }
 #theme-toggle:hover { opacity: 0.8; }
 
@@ -120,59 +164,52 @@ transition: background-color 0.2s ease, color 0.2s ease;
 }
 .section-header:first-of-type { margin-top: 10px; }
 
-.ticket-table { /* Class name kept for now, can be .incident-table */
+.item-table { /* Renamed from .ticket-table */
     width: 100%;
     border-collapse: collapse;
     background-color: var(--table-bg);
     box-shadow: var(--table-shadow);
-    font-size: 1em;
+    font-size: 1em; /* Relative to body font size */
     margin-bottom: 20px;
 }
-.ticket-table th, .ticket-table td {
+.item-table th, .item-table td {
     border: 1px solid var(--table-border);
     padding: 11px 13px;
     text-align: left;
     vertical-align: top;
 }
-.ticket-table th {
+.item-table th {
     background-color: var(--table-th-bg);
     color: var(--table-th-text);
     font-weight: 600;
-    font-size: 1.05em;
+    font-size: 1.05em; /* Slightly larger than td text */
 }
-.ticket-table tr:nth-child(even) { background-color: var(--table-row-even-bg); }
-.ticket-table tr:hover { background-color: var(--table-row-hover-bg); }
+.item-table tr:nth-child(even) { background-color: var(--table-row-even-bg); }
+.item-table tr:hover { background-color: var(--table-row-hover-bg); }
 
 /* Styles for sortable headers */
 .sortable-header {
     cursor: pointer;
-    position: relative; /* For positioning the arrow */
+    position: relative;
 }
 .sortable-header:hover {
-    /* Use a slightly different background on hover for TH if desired */
-    background-color: var(--table-row-hover-bg);
+    background-color: var(--table-row-hover-bg); /* Consistent hover */
 }
 .sortable-header::after {
     content: '';
     display: inline-block;
-    width: 1em; /* Reserve space for arrow */
+    width: 1em;
     text-align: right;
     margin-left: 5px;
     opacity: 0.5;
 }
-.sortable-header.sort-asc::after {
-    content: '▲';
-    opacity: 1;
-}
-.sortable-header.sort-desc::after {
-    content: '▼';
-    opacity: 1;
-}
+.sortable-header.sort-asc::after { content: '▲'; opacity: 1; }
+.sortable-header.sort-desc::after { content: '▼'; opacity: 1; }
 
 
-.ticket-id a { font-weight: 600; color: var(--ticket-id-link); text-decoration: none; }
-.ticket-id a:hover { text-decoration: underline; }
-.ticket-subject { font-weight: 500; word-break: break-word; }
+.item-id a { font-weight: 600; color: var(--item-id-link); text-decoration: none; } /* Renamed */
+.item-id a:hover { text-decoration: underline; }
+.item-subject { font-weight: 500; word-break: break-word; } /* Renamed */
 
 .description-tooltip { position: relative; cursor: help; }
 .description-tooltip .tooltiptext {
@@ -184,10 +221,10 @@ transition: background-color 0.2s ease, color 0.2s ease;
     border-radius: 6px;
     padding: 12px;
     position: absolute;
-    z-index: 1;
+    z-index: 10; /* Ensure tooltip is on top */
     bottom: 125%;
     left: 50%;
-    margin-left: -170px; /* Half of width */
+    margin-left: -170px;
     opacity: 0;
     transition: opacity 0.3s;
     font-size: 0.9em;
@@ -221,23 +258,23 @@ transition: background-color 0.2s ease, color 0.2s ease;
     animation: blink-animation 1.2s steps(5, start) infinite alternate;
 }
 
-/* Column Widths */
+/* Column Widths - adjust as needed */
 .col-id { width: 5%; }
-.col-subject { width: 30%; max-width: 30%; }
+.col-subject { width: 30%; max-width: 300px; } /* Added max-width */
 .col-requester {width: 9%;}
 .col-agent { width: 9%; }
 .col-priority { width: 8%; }
-.col-action-sla { width: 23%; }
+.col-action-sla { width: 23%; } /* Might need more space for SLA text + due date */
 .col-updated { width: 8%; }
 .col-created { width: 8%; }
 
-.no-tickets-message { /* Class name kept for now */
+.no-items-message { /* Renamed */
     text-align: center;
     font-size: 1.2em;
     padding: 20px;
-    color: #aaa;
+    color: #aaa; /* Fallback, will be overridden by theme */
 }
-body.light-mode .no-tickets-message { color: #666; }
+body.light-mode .no-items-message { color: #666; } /* Renamed */
 
 .datetime-container .local-datetime { display: block; font-size: 1em; }
 .datetime-container .utc-detail { display: block; font-size: 0.85em; opacity: 0.75; margin-top: 2px; }
@@ -246,7 +283,22 @@ body.light-mode .no-tickets-message { color: #666; }
     body { font-size: 20px; padding: 20px; }
     h1 { font-size: 2.8em; margin-bottom: 20px; }
     .info-bar { padding: 14px 20px; font-size: 1.2em; margin-bottom: 20px;}
-    .ticket-table th, .ticket-table td { padding: 14px 17px; }
-    .ticket-table th {font-size: 1.1em;}
+    .item-table th, .item-table td { padding: 14px 17px; } /* Renamed */
+    .item-table th {font-size: 1.1em;} /* Renamed */
     .section-header { font-size: 1.8em; padding: 14px 20px;}
+    .col-subject { max-width: 400px; }
+}
+
+@media (max-width: 768px) {
+    body { font-size: 16px; padding: 10px;}
+    h1 { font-size: 1.8em; }
+    .info-bar { flex-direction: column; align-items: flex-start; }
+    .info-bar > span { margin: 5px 0; }
+    .ticket-type-switcher { margin-bottom: 10px; width: 100%; }
+    #theme-toggle { margin-left: 0; margin-top: 10px; align-self: flex-start; }
+    .item-table { font-size: 0.9em; } /* Renamed */
+    .item-table th, .item-table td { padding: 8px 10px; } /* Renamed */
+    .col-subject { max-width: 200px; }
+    /* Hide less critical columns on small screens if necessary */
+    /* .col-created, .col-agent { display: none; } */
 }

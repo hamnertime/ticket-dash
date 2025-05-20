@@ -3,29 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integotec - Incident Dashboard</title>
+    <title>Integotec - {{ page_title_type }} Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script>
-        // Pass config from Flask to JavaScript
         window.FRESHSERVICE_BASE_URL = "{{ freshservice_base_url }}";
         window.AUTO_REFRESH_MS = {{ auto_refresh_ms }};
-        window.OPEN_INCIDENT_STATUS_ID = {{ OPEN_INCIDENT_STATUS_ID }}; // Renamed from OPEN_TICKET_STATUS_ID
-        window.WAITING_ON_CUSTOMER_STATUS_ID = {{ WAITING_ON_CUSTOMER_STATUS_ID }};
-        // Add other constants if JS needs them
+        window.CURRENT_TICKET_TYPE_SLUG = "{{ current_ticket_type_slug }}";
+        window.CURRENT_TICKET_TYPE_DISPLAY = "{{ current_ticket_type_display }}";
+        // Constants for status IDs can be passed if JS needs them for specific logic,
+        // but much of the display logic is now handled by Flask before rendering.
+        // window.OPEN_STATUS_ID = {{ OPEN_STATUS_ID }};
+        // window.PENDING_STATUS_ID = {{ PENDING_STATUS_ID }};
     </script>
 </head>
 <body>
     <div class="container">
-        <h1>Integotec - Incident Dashboard</h1>
+        <h1>Integotec - {{ page_title_type }} Dashboard</h1>
+
         <div class="info-bar">
-            <span>Total Active Incidents: <strong id="total-active-incidents-count">{{ s1_open_incidents|length + s2_waiting_agent_incidents|length + s3_remaining_incidents|length }}</strong></span>
+            <div class="ticket-type-switcher">
+                <span>View:</span>
+                {% for slug, display_name in supported_ticket_types.items() %}
+                    <a href="{{ url_for('dashboard_typed', ticket_type_slug=slug) }}"
+                       class="type-switch-button {% if slug == current_ticket_type_slug %}active{% endif %}">
+                        {{ display_name }}s
+                    </a>
+                {% endfor %}
+            </div>
+            <span>Total Active {{ current_ticket_type_display }}s: <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length }}</strong></span>
             <span>Dashboard Generated: <em id="dashboard-generated-time">Loading...</em></span>
             <button id="theme-toggle">Toggle Theme</button>
         </div>
 
-        {# --- Section 1: Open Incidents --- #}
-        <div class="section-header">Open Incidents (<span id="s1-incident-count">{{ s1_open_incidents|length }}</span>)</div>
-        <table class="ticket-table" id="s1-incident-table">
+        {# --- Section 1: Items needing primary attention --- #}
+        <div class="section-header" id="s1-header">{{ section1_name }} (<span id="s1-item-count">{{ s1_items|length }}</span>)</div>
+        <table class="item-table" id="s1-item-table">
             <thead>
                 <tr>
                     <th class="col-id sortable-header" data-sort-key="id">ID</th>
@@ -38,35 +50,41 @@
                     <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
                 </tr>
             </thead>
-            <tbody id="s1-incidents-body">
-                {% if s1_open_incidents %}
-                    {% for incident in s1_open_incidents %}
+            <tbody id="s1-items-body">
+                {% if s1_items %}
+                    {% for item in s1_items %}
                     <tr>
-                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ incident.id }}" target="_blank">{{ incident.id }}</a></td>
-                        <td class="ticket-subject description-tooltip">{{ incident.subject | truncate(60, True) }}{% if incident.description_text %}<span class="tooltiptext">{{ incident.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ incident.requester_name }}</td>
-                        <td>{{ incident.agent_name }}</td>
-                        <td><span class="priority-{{ incident.priority_text }}">{{ incident.priority_text }}</span></td>
+                        <td class="item-id"><a href="{{ freshservice_base_url }}{{ item.id }}" target="_blank">{{ item.id }}</a></td>
+                        <td class="item-subject description-tooltip">{{ item.subject | truncate(60, True) }}{% if item.description_text %}<span class="tooltiptext">{{ item.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ item.requester_name }}</td>
+                        <td>{{ item.agent_name }}</td>
+                        <td><span class="priority-{{ item.priority_text }}">{{ item.priority_text }}</span></td>
                         <td class="col-action-sla">
-                            <span class="sla-status-text {{ incident.sla_class }}">{{ incident.sla_text }}</span>
-                            {% if incident.first_responded_at_iso is none and incident.fr_due_by_str %}
-                                <div class="datetime-container" data-utc-datetime="{{ incident.fr_due_by_str }}" data-prefix="FR Due: ">
+                            <span class="sla-status-text {{ item.sla_class }}">{{ item.sla_text }}</span>
+                            {# FR Due date display for items that haven't been first responded to and have an FR due date #}
+                            {# This logic might need to be adjusted based on how fr_due_by applies to Service Requests #}
+                            {% if item.first_responded_at_iso is none and item.fr_due_by_str %}
+                                <div class="datetime-container" data-utc-datetime="{{ item.fr_due_by_str }}" data-prefix="FR Due: ">
+                                    <small class="local-datetime">Loading...</small>
+                                </div>
+                            {% elif item.type == 'Service Request' and item.due_by_str %}
+                                <div class="datetime-container" data-utc-datetime="{{ item.due_by_str }}" data-prefix="Due: ">
                                     <small class="local-datetime">Loading...</small>
                                 </div>
                             {% endif %}
                         </td>
-                        <td>{{ incident.updated_friendly }}</td>
-                        <td>{{ incident.created_days_old }}</td>
+                        <td>{{ item.updated_friendly }}</td>
+                        <td>{{ item.created_days_old }}</td>
                     </tr>
                     {% endfor %}
                 {% endif %}
             </tbody>
         </table>
-        <p id="s1-no-incidents-message" class="no-tickets-message" {% if s1_open_incidents %}style="display: none;"{% endif %}>No incidents currently in 'Open' status.</p>
+        <p id="s1-no-items-message" class="no-items-message" {% if s1_items %}style="display: none;"{% endif %}>No {{ current_ticket_type_display | lower }}s currently in this category.</p>
 
         {# --- Section 2: Waiting on Agent --- #}
-        <div class="section-header">Waiting on Agent (<span id="s2-incident-count">{{ s2_waiting_agent_incidents|length }}</span>)</div>
-        <table class="ticket-table" id="s2-incident-table">
+        <div class="section-header" id="s2-header">{{ section2_name }} (<span id="s2-item-count">{{ s2_items|length }}</span>)</div>
+        <table class="item-table" id="s2-item-table">
             <thead>
                 <tr>
                     <th class="col-id sortable-header" data-sort-key="id">ID</th>
@@ -79,30 +97,30 @@
                     <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
                 </tr>
             </thead>
-            <tbody id="s2-incidents-body">
-                {% if s2_waiting_agent_incidents %}
-                    {% for incident in s2_waiting_agent_incidents %}
+            <tbody id="s2-items-body">
+                {% if s2_items %}
+                    {% for item in s2_items %}
                     <tr>
-                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ incident.id }}" target="_blank">{{ incident.id }}</a></td>
-                        <td class="ticket-subject description-tooltip">{{ incident.subject | truncate(60, True) }}{% if incident.description_text %}<span class="tooltiptext">{{ incident.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ incident.requester_name }}</td>
-                        <td>{{ incident.agent_name }}</td>
-                        <td><span class="priority-{{ incident.priority_text }}">{{ incident.priority_text }}</span></td>
+                        <td class="item-id"><a href="{{ freshservice_base_url }}{{ item.id }}" target="_blank">{{ item.id }}</a></td>
+                        <td class="item-subject description-tooltip">{{ item.subject | truncate(60, True) }}{% if item.description_text %}<span class="tooltiptext">{{ item.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ item.requester_name }}</td>
+                        <td>{{ item.agent_name }}</td>
+                        <td><span class="priority-{{ item.priority_text }}">{{ item.priority_text }}</span></td>
                         <td class="col-action-sla">
-                            <span class="sla-status-text {{ incident.sla_class }}">{{ incident.sla_text }}</span>
+                            <span class="sla-status-text {{ item.sla_class }}">{{ item.sla_text }}</span>
                         </td>
-                        <td>{{ incident.updated_friendly }}</td>
-                        <td>{{ incident.created_days_old }}</td>
+                        <td>{{ item.updated_friendly }}</td>
+                        <td>{{ item.created_days_old }}</td>
                     </tr>
                     {% endfor %}
                 {% endif %}
             </tbody>
         </table>
-        <p id="s2-no-incidents-message" class="no-tickets-message" {% if s2_waiting_agent_incidents %}style="display: none;"{% endif %}>No incidents currently in 'Waiting on Agent' status.</p>
+        <p id="s2-no-items-message" class="no-items-message" {% if s2_items %}style="display: none;"{% endif %}>No {{ current_ticket_type_display | lower }}s currently 'Waiting on Agent'.</p>
 
-        {# --- Section 3: Remaining Active Incidents --- #}
-        <div class="section-header">Remaining Active Incidents (<span id="s3-incident-count">{{ s3_remaining_incidents|length }}</span>)</div>
-        <table class="ticket-table" id="s3-incident-table">
+        {# --- Section 3: Remaining Active Items --- #}
+        <div class="section-header" id="s3-header">{{ section3_name }} (<span id="s3-item-count">{{ s3_items|length }}</span>)</div>
+        <table class="item-table" id="s3-item-table">
             <thead>
                 <tr>
                     <th class="col-id sortable-header" data-sort-key="id">ID</th>
@@ -115,26 +133,26 @@
                     <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
                 </tr>
             </thead>
-            <tbody id="s3-incidents-body">
-                {% if s3_remaining_incidents %}
-                    {% for incident in s3_remaining_incidents %}
+            <tbody id="s3-items-body">
+                {% if s3_items %}
+                    {% for item in s3_items %}
                     <tr>
-                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ incident.id }}" target="_blank">{{ incident.id }}</a></td>
-                        <td class="ticket-subject description-tooltip">{{ incident.subject | truncate(60, True) }}{% if incident.description_text %}<span class="tooltiptext">{{ incident.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ incident.requester_name }}</td>
-                        <td>{{ incident.agent_name }}</td>
-                        <td><span class="priority-{{ incident.priority_text }}">{{ incident.priority_text }}</span></td>
+                        <td class="item-id"><a href="{{ freshservice_base_url }}{{ item.id }}" target="_blank">{{ item.id }}</a></td>
+                        <td class="item-subject description-tooltip">{{ item.subject | truncate(60, True) }}{% if item.description_text %}<span class="tooltiptext">{{ item.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
+                        <td>{{ item.requester_name }}</td>
+                        <td>{{ item.agent_name }}</td>
+                        <td><span class="priority-{{ item.priority_text }}">{{ item.priority_text }}</span></td>
                         <td class="col-action-sla">
-                            <span class="sla-status-text {{ incident.sla_class }}">{{ incident.sla_text }}</span>
+                            <span class="sla-status-text {{ item.sla_class }}">{{ item.sla_text }}</span>
                         </td>
-                        <td>{{ incident.updated_friendly }}</td>
-                        <td>{{ incident.created_days_old }}</td>
+                        <td>{{ item.updated_friendly }}</td>
+                        <td>{{ item.created_days_old }}</td>
                     </tr>
                     {% endfor %}
                 {% endif %}
             </tbody>
         </table>
-        <p id="s3-no-incidents-message" class="no-tickets-message" {% if s3_remaining_incidents %}style="display: none;"{% endif %}>No other active incidents found.</p>
+        <p id="s3-no-items-message" class="no-items-message" {% if s3_items %}style="display: none;"{% endif %}>No other active {{ current_ticket_type_display | lower }}s found.</p>
     </div>
 
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>

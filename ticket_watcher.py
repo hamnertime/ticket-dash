@@ -12,9 +12,9 @@ TOKEN_FILE = "./token.txt"
 FRESHSERVICE_DOMAIN = "integotecllc.freshservice.com"
 BASE_URL = f"https://{FRESHSERVICE_DOMAIN}"
 STATUS_IDS_TO_INCLUDE = [2, 3, 8, 9, 10, 13, 23, 26] # Statuses to fetch initially
-# Example: [2, 5, 19, 13, 23, 8, 9, 10, 3, 4, 21, 20, 14, 11, 15, 16, 26]
-ORDER_BY_FIELD = "updated_at" # Not directly used by /api/v2/tickets/filter, but good for reference
-ORDER_TYPE = "desc" # Not directly used by /api/v2/tickets/filter
+TYPES_TO_INCLUDE = ["Incident", "Service Request"] # MODIFIED: Specify types to include
+ORDER_BY_FIELD = "updated_at"
+ORDER_TYPE = "desc"
 TICKETS_PER_PAGE = 30
 MAX_RETRIES = 3
 RETRY_DELAY = 5 # seconds for general retries
@@ -27,7 +27,6 @@ TICKETS_DIR = "./tickets"
 ARCHIVE_DIR_BASE = os.path.join(TICKETS_DIR, "archive")
 POLL_INTERVAL = 30 # seconds
 LOG_FILE = "./ticket_poller.log"
-# LOCK_FILE = "./ticket_poller.lock" # Removed lock file logic
 
 # --- Logging Function ---
 def log_message(message, is_error=False):
@@ -47,7 +46,6 @@ def read_api_key(file_path):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         abs_file_path = os.path.join(script_dir, file_path)
         if not os.path.exists(abs_file_path):
-            # Fallback to CWD if not found in script directory
             abs_file_path = os.path.abspath(file_path)
             log_message(f"Token file not found at script dir, trying CWD: {abs_file_path}")
 
@@ -79,7 +77,6 @@ def ensure_directories():
 def get_local_ticket_ids(directory):
     local_ids = set()
     if not os.path.isdir(directory):
-        # This is not necessarily an error if the dir is empty or just created
         log_message(f"Directory {directory} does not exist or is not accessible for reading local IDs.")
         return local_ids
     try:
@@ -101,7 +98,6 @@ def write_ticket_file(ticket_data):
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(ticket_data, f, indent=4)
-        # log_message(f"Successfully wrote ticket {ticket_id} to {file_path}") # Can be too verbose
     except IOError as e:
         log_message(f"Error writing ticket file {file_path}: {e}", is_error=True)
     except Exception as e:
@@ -115,7 +111,7 @@ def archive_ticket_file(ticket_id):
         os.makedirs(archive_date_dir, exist_ok=True)
     except OSError as e:
         log_message(f"Error creating archive dir '{archive_date_dir}': {e}", is_error=True)
-        return # Don't proceed if archive subdir can't be made
+        return
 
     source_path = os.path.join(TICKETS_DIR, f"{ticket_id}.txt")
     destination_path = os.path.join(archive_date_dir, f"{ticket_id}.txt")
@@ -131,14 +127,18 @@ def archive_ticket_file(ticket_id):
 
 
 # --- Fetch Filtered Ticket List (Step 1) ---
-def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type): # order_by, order_type not used by filter API
+def get_filtered_ticket_list(base_url, headers, status_ids):
     all_basic_tickets = []
     page = 1
     filter_endpoint = f"{base_url}/api/v2/tickets/filter"
-    fetched_ids_current_run = set() # To avoid duplicates if API returns them across pages
+    fetched_ids_current_run = set()
 
     status_queries = [f"status:{status_id}" for status_id in status_ids]
-    raw_query_value = f"({' OR '.join(status_queries)})"
+    # Create a query that includes any of the specified types
+    type_queries = [f"ticket_type:'{ticket_type}'" for ticket_type in TYPES_TO_INCLUDE]
+
+    # Combine status and type queries: (status:A OR status:B) AND (type:X OR type:Y)
+    raw_query_value = f"({' OR '.join(status_queries)}) AND ({' OR '.join(type_queries)})"
     query_param_value = f'"{raw_query_value}"'
 
     log_message(f"Fetching filtered ticket list. Query: {query_param_value}")
@@ -153,7 +153,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
         while retries <= MAX_RETRIES:
             try:
                 response = requests.get(filter_endpoint, headers=headers, params=params, timeout=30)
-                if response.status_code == 429: # Rate limit
+                if response.status_code == 429:
                     if retries < MAX_RETRIES:
                         retry_after = int(response.headers.get('Retry-After', RETRY_DELAY))
                         log_message(f"Rate limit on list fetch. Waiting {retry_after}s. Retry {retries+1}/{MAX_RETRIES}...", is_error=True)
@@ -206,7 +206,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
              return None
 
     if page > MAX_PAGES:
-        log_message(f"Warning: List fetch reached MAX_PAGES ({MAX_PAGES}). Some tickets might be missed if total > {MAX_PAGES * TICKETS_PER_PAGE}.", is_error=True)
+        log_message(f"Warning: List fetch reached MAX_PAGES ({MAX_PAGES}). Some tickets might be missed if total > {MAX_PAGES * TICKETS_PER_PAGE * len(TYPES_TO_INCLUDE)}.", is_error=True)
     return all_basic_tickets
 
 # --- Fetch Single Ticket Details with Stats (Step 2) ---
@@ -264,9 +264,10 @@ def main_loop():
     log_message(f"Tickets directory: '{TICKETS_DIR}'")
     log_message(f"Archive directory base: '{ARCHIVE_DIR_BASE}'")
     log_message(f"Fetching tickets with status IDs: {STATUS_IDS_TO_INCLUDE}")
+    log_message(f"Fetching tickets with types: {TYPES_TO_INCLUDE}") # MODIFIED Log
     log_message(f"Max pages per API list fetch: {MAX_PAGES}, Tickets per page: {TICKETS_PER_PAGE}")
     log_message(f"Delay between individual ticket detail fetches: {DELAY_BETWEEN_DETAIL_FETCHES}s")
-    log_message(f"Only creating local files for tickets of type: 'Incident'")
+
 
     ensure_directories()
     API_KEY = read_api_key(TOKEN_FILE)
@@ -285,7 +286,7 @@ def main_loop():
         log_message("--- Poll Cycle Start ---")
 
         basic_ticket_data_list = get_filtered_ticket_list(
-            BASE_URL, headers, STATUS_IDS_TO_INCLUDE, ORDER_BY_FIELD, ORDER_TYPE
+            BASE_URL, headers, STATUS_IDS_TO_INCLUDE
         )
 
         if basic_ticket_data_list is None:
@@ -297,7 +298,7 @@ def main_loop():
         if not basic_ticket_data_list:
             log_message("No tickets found in the initial list fetch for the given criteria.")
         else:
-            log_message(f"Fetched {len(basic_ticket_data_list)} basic ticket entries. Now fetching details and filtering for Incidents...")
+            log_message(f"Fetched {len(basic_ticket_data_list)} basic ticket entries. Now fetching details and filtering for specified types: {TYPES_TO_INCLUDE}...")
             for i, basic_ticket in enumerate(basic_ticket_data_list):
                 ticket_id = basic_ticket.get('id')
                 if not ticket_id:
@@ -307,45 +308,48 @@ def main_loop():
                 detailed_ticket = get_ticket_details_with_stats(ticket_id, BASE_URL, headers)
                 if detailed_ticket:
                     ticket_type = detailed_ticket.get('type')
-                    if ticket_type == "Incident":
+                    if ticket_type in TYPES_TO_INCLUDE: # MODIFIED: Filter by TYPES_TO_INCLUDE
                         enriched_ticket_data_list.append(detailed_ticket)
+                    # else: # Optional: Log if a ticket of an unexpected type was fetched by the initial broad query
+                        # log_message(f"Ticket ID {ticket_id} is of type '{ticket_type}', which is not in TYPES_TO_INCLUDE. Skipping.")
                 else:
                     log_message(f"Failed to fetch details for ticket ID {ticket_id}. It will be excluded.", is_error=True)
 
                 if i < len(basic_ticket_data_list) - 1:
                     time.sleep(DELAY_BETWEEN_DETAIL_FETCHES)
-            log_message(f"After detail fetch and type filtering, {len(enriched_ticket_data_list)} 'Incident' tickets remain for processing.")
+            log_message(f"After detail fetch and type filtering, {len(enriched_ticket_data_list)} tickets of types '{', '.join(TYPES_TO_INCLUDE)}' remain for processing.")
 
-        api_incident_ticket_ids = set()
+        api_ticket_ids_for_processing = set()
         if enriched_ticket_data_list:
             for ticket_data in enriched_ticket_data_list:
                 if isinstance(ticket_data, dict) and 'id' in ticket_data:
-                     api_incident_ticket_ids.add(ticket_data['id'])
-        log_message(f"API returned {len(api_incident_ticket_ids)} unique 'Incident' ticket IDs this cycle.")
+                     api_ticket_ids_for_processing.add(ticket_data['id'])
+        log_message(f"API returned {len(api_ticket_ids_for_processing)} unique ticket IDs for processing this cycle.")
 
         local_ticket_ids_before_processing = get_local_ticket_ids(TICKETS_DIR)
-        log_message(f"State: {len(local_ticket_ids_before_processing)} local files, {len(api_incident_ticket_ids)} FreshService 'Incident' tickets active.")
+        log_message(f"State: {len(local_ticket_ids_before_processing)} local files, {len(api_ticket_ids_for_processing)} FreshService tickets of specified types are active.")
 
         active_files_written_count = 0
         if enriched_ticket_data_list:
-            for ticket_data in enriched_ticket_data_list:
-                if isinstance(ticket_data, dict) and 'id' in ticket_data and ticket_data.get('type') == "Incident":
+            for ticket_data in enriched_ticket_data_list: # Iterate through the enriched list which is already filtered by type
+                if isinstance(ticket_data, dict) and 'id' in ticket_data: # Redundant type check removed, already filtered
                     write_ticket_file(ticket_data)
                     active_files_written_count +=1
-        log_message(f"Wrote/updated {active_files_written_count} 'Incident' ticket files in '{TICKETS_DIR}'.")
+        log_message(f"Wrote/updated {active_files_written_count} ticket files (types: {', '.join(TYPES_TO_INCLUDE)}) in '{TICKETS_DIR}'.")
 
-        closed_or_missing_incident_ids = local_ticket_ids_before_processing - api_incident_ticket_ids
+        # Files to archive are those present locally but NOT in the current list of active tickets (of specified types) from API
+        closed_or_missing_ticket_ids = local_ticket_ids_before_processing - api_ticket_ids_for_processing
         num_tickets_archived_this_cycle = 0
-        if closed_or_missing_incident_ids:
-            log_message(f"Found {len(closed_or_missing_incident_ids)} local files to archive (no longer active Incidents): {closed_or_missing_incident_ids}")
-            for ticket_id_to_archive in closed_or_missing_incident_ids:
+        if closed_or_missing_ticket_ids:
+            log_message(f"Found {len(closed_or_missing_ticket_ids)} local files to archive (no longer active or not of specified types): {closed_or_missing_ticket_ids}")
+            for ticket_id_to_archive in closed_or_missing_ticket_ids:
                 archive_ticket_file(ticket_id_to_archive)
                 num_tickets_archived_this_cycle += 1
         else:
             log_message("No local ticket files to archive in this cycle.")
 
-        newly_added_incident_ids = api_incident_ticket_ids - local_ticket_ids_before_processing
-        log_message(f"Changes: {len(newly_added_incident_ids)} new 'Incident' tickets processed, {num_tickets_archived_this_cycle} old/non-Incident files archived.")
+        newly_added_ticket_ids = api_ticket_ids_for_processing - local_ticket_ids_before_processing
+        log_message(f"Changes: {len(newly_added_ticket_ids)} new tickets processed, {num_tickets_archived_this_cycle} old/non-specified-type files archived.")
 
         cycle_duration = time.time() - current_cycle_start_time
         log_message(f"--- Poll cycle finished in {cycle_duration:.2f} seconds. ---")
@@ -358,39 +362,9 @@ def main_loop():
             log_message("Warning: Poll cycle took longer than POLL_INTERVAL. Running next cycle immediately.", is_error=True)
 
 if __name__ == '__main__':
-    # Removed lock file mechanism. Systemd will manage singleton execution.
-    # script_dir_for_lock = os.path.dirname(os.path.abspath(__file__))
-    # lock_file_path = os.path.join(script_dir_for_lock, LOCK_FILE)
-
-    # if os.path.exists(lock_file_path):
-    #     try:
-    #         with open(lock_file_path, 'r') as lf:
-    #             pid_str = lf.read().strip()
-    #             if pid_str:
-    #                 log_message(f"Lock file '{lock_file_path}' exists (PID: {pid_str}). Another instance might be running. Exiting.", is_error=True)
-    #                 sys.exit(1)
-    #             else: # Lock file exists but is empty
-    #                 log_message(f"Lock file '{lock_file_path}' exists but is empty. Assuming stale and proceeding.", is_error=True) # Changed behavior
-    #     except ValueError:
-    #         log_message(f"Lock file '{lock_file_path}' exists but contains invalid PID. Assuming stale and proceeding.", is_error=True) # Changed behavior
-    #     except Exception as e:
-    #         log_message(f"Error checking lock file '{lock_file_path}': {e}. Assuming stale and proceeding.", is_error=True) # Changed behavior
-            # sys.exit(1) # Original exit removed
-
     try:
-        # with open(lock_file_path, 'w') as lf: # Removed lock file creation
-        #     lf.write(str(os.getpid()))
         main_loop()
     except KeyboardInterrupt:
         log_message("Poller interrupted by user (Ctrl+C). Exiting gracefully.")
     except Exception as e:
         log_message(f"Unhandled exception in main_loop: {e}", is_error=True)
-        # import traceback
-        # log_message(traceback.format_exc(), is_error=True)
-    # finally: # Removed lock file cleanup from script
-        # if os.path.exists(lock_file_path):
-        #     try:
-        #         os.remove(lock_file_path)
-        #         log_message(f"Lock file '{lock_file_path}' removed.")
-        #     except Exception as e:
-        #         log_message(f"Error removing lock file '{lock_file_path}': {e}", is_error=True)
