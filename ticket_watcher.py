@@ -11,7 +11,7 @@ import shutil   # Added for moving files
 TOKEN_FILE = "./token.txt"
 FRESHSERVICE_DOMAIN = "integotecllc.freshservice.com"
 BASE_URL = f"https://{FRESHSERVICE_DOMAIN}"
-STATUS_IDS_TO_INCLUDE = [2, 3, 8, 9, 10, 13, 23, 26] # Statuses to fetch initially
+STATUS_IDS_TO_INCLUDE = [2, 3, 8, 9, 10, 13, 19, 23, 26] # Statuses to fetch initially (Added 19 for 'Update Needed')
 TYPES_TO_INCLUDE = ["Incident", "Service Request"] # Define types to process
 
 ORDER_BY_FIELD = "updated_at" # Not directly used by /api/v2/tickets/filter, but good for reference

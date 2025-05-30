@@ -23,6 +23,8 @@ PENDING_STATUS_ID = 3 # Often used for SRs waiting for items/approvals
 WAITING_ON_CUSTOMER_STATUS_ID = 9
 WAITING_ON_AGENT_STATUS_ID = 26 # More specific to Freshservice workflow
 ON_HOLD_STATUS_ID = 23
+UPDATE_NEEDED_STATUS_ID = 19
+
 
 # Ticket Types (as they appear in Freshservice data)
 TICKET_TYPE_INCIDENT = "Incident"
@@ -138,6 +140,7 @@ def get_status_text(status_id, ticket_type=""): # ticket_type can be used for mo
         WAITING_ON_CUSTOMER_STATUS_ID: "Waiting on Customer",
         10: "Waiting on Third Party", # Might be custom
         13: "Under Investigation", # Likely Incident specific
+        19: "Update Needed",       # <-- ADD THIS LINE (using 19 directly or UPDATE_NEEDED_STATUS_ID if defined)
         ON_HOLD_STATUS_ID: "On Hold",
         WAITING_ON_AGENT_STATUS_ID: "Waiting on Agent",
         # Add Service Request specific statuses if known, e.g.:
@@ -255,7 +258,7 @@ def load_and_process_tickets(current_ticket_type_filter):
                 # OPEN_STATUS_ID for incidents, PENDING_STATUS_ID or OPEN_STATUS_ID for SRs might be relevant here.
                 # This logic needs to be flexible for both types.
                 # For Incidents, fr_due_by is key. For SRs, fr_due_by or due_by might be key.
-                section1_trigger_statuses = [OPEN_STATUS_ID]
+                section1_trigger_statuses = [OPEN_STATUS_ID, UPDATE_NEEDED_STATUS_ID] # Added UPDATE_NEEDED_STATUS_ID
                 if ticket_data_item['type'] == TICKET_TYPE_SERVICE_REQUEST:
                     section1_trigger_statuses.append(PENDING_STATUS_ID) # SRs might be "Pending" but need action
 
