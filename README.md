@@ -220,6 +220,16 @@ This project includes example `systemd` service files in the `./startup/` direct
     sudo journalctl -u ticket-watcher.service -f
     sudo journalctl -u blinky.service -f
     ```
+    
+**Automating `update_requesters.py` (Optional):**
+
+If you want `update_requesters.py` to run automatically, you can set up a cron job. For example, to run it daily at 3:00 AM:
+
+1.  Edit your crontab: `crontab -e`
+2.  Add a line like this (adjust paths and schedule as needed):
+    ```cron
+    0 3 * * * /full/path/to/your/ticket-dash/pyenv/bin/python3 /full/path/to/your/ticket-dash/update_requesters.py >> /full/path/to/your/ticket-dash/update_requesters.log 2>&1
+    ```
 
 ## Usage
 
