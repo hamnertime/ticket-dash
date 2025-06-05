@@ -18,15 +18,15 @@ FR_SLA_CRITICAL_HOURS = 4
 FR_SLA_WARNING_HOURS = 12
 
 # Status IDs from Freshservice
-OPEN_STATUS_ID = 2 # Generic "Open" - might be named "Open" for Incidents, "Pending" for SRs
-PENDING_STATUS_ID = 3 # Often used for SRs waiting for items/approvals
+OPEN_STATUS_ID = 2
+PENDING_STATUS_ID = 3
 WAITING_ON_CUSTOMER_STATUS_ID = 9
-WAITING_ON_AGENT_STATUS_ID = 26 # More specific to Freshservice workflow
+WAITING_ON_AGENT_STATUS_ID = 26
 ON_HOLD_STATUS_ID = 23
 UPDATE_NEEDED_STATUS_ID = 19
 
 
-# Ticket Types (as they appear in Freshservice data)
+# Ticket Types
 TICKET_TYPE_INCIDENT = "Incident"
 TICKET_TYPE_SERVICE_REQUEST = "Service Request"
 SUPPORTED_TICKET_TYPES = {
@@ -228,8 +228,6 @@ def load_and_process_tickets(current_ticket_type_filter):
                 ticket_data_item['requester_name'] = REQUESTER_MAPPING.get(requester_id_from_item, f"Req. ID: {requester_id_from_item}") if requester_id_from_item else 'N/A'
 
                 sla_target_due_dt_str = ticket_data_item['fr_due_by_str']
-                # if ticket_data_item['type'] == TICKET_TYPE_SERVICE_REQUEST and ticket_data_item['due_by_str']:
-                     # pass # Future refinement if SR due_by is primary SLA
 
                 ticket_data_item['sla_target_due_dt_obj'] = parse_datetime_utc(sla_target_due_dt_str)
                 ticket_data_item['updated_at_dt_obj'] = parse_datetime_utc(ticket_data_item['updated_at_str'])
@@ -242,10 +240,9 @@ def load_and_process_tickets(current_ticket_type_filter):
                 ticket_data_item['created_days_old'] = days_since(ticket_data_item['created_at_dt_obj'])
                 ticket_data_item['agent_responded_friendly'] = time_since(ticket_data_item['agent_responded_at_dt_obj'])
 
-                current_status_text = get_status_text(ticket_data_item['status_raw'], ticket_data_item['type'])
-                ticket_data_item['status_text'] = current_status_text
-                # Default SLA text and class, will be overridden if specific conditions met
-                ticket_data_item['sla_text'] = f"{current_status_text} ({ticket_data_item['updated_friendly']})"
+                original_status_text = get_status_text(ticket_data_item['status_raw'], ticket_data_item['type'])
+                ticket_data_item['status_text'] = original_status_text # Keep original status text for data
+                ticket_data_item['sla_text'] = f"{original_status_text} ({ticket_data_item['updated_friendly']})"
                 ticket_data_item['sla_class'] = "sla-in-progress"
 
 
@@ -277,12 +274,12 @@ def load_and_process_tickets(current_ticket_type_filter):
                      fr_sla_metric = fr_hours_remaining
                 ticket_data_item['_sort_fr_sla_metric'] = fr_sla_metric
 
-                # --- MODIFIED: Categorization Logic ---
+                # --- REVISED: Categorization Logic ---
                 if is_update_sla_breached:
-                    # ALL tickets breaching update SLA go to Section 1
-                    ticket_data_item['sla_text'] = f"Update Overdue ({current_status_text}, {ticket_data_item['updated_friendly']})"
+                    # Tickets breaching update SLA go to Section 2
+                    ticket_data_item['sla_text'] = f"Update Overdue ({original_status_text}, {ticket_data_item['updated_friendly']})"
                     ticket_data_item['sla_class'] = "sla-critical"
-                    list_section1_items.append(ticket_data_item)
+                    list_section2_items.append(ticket_data_item)
                 else:
                     # For non-update-breached tickets, use status-based categorization
                     section1_trigger_statuses = [OPEN_STATUS_ID, UPDATE_NEEDED_STATUS_ID]
@@ -290,25 +287,26 @@ def load_and_process_tickets(current_ticket_type_filter):
                         section1_trigger_statuses.append(PENDING_STATUS_ID)
 
                     if ticket_data_item['status_raw'] in section1_trigger_statuses:
-                        if needs_fr: # Not update breached, IS in Open/UpdateNeeded, AND needs FR
+                        # Section 1: Open/UpdateNeeded/Pending (SR) AND NOT update breached
+                        if needs_fr:
                             sla_text_fr, sla_class_fr, _ = get_fr_sla_details(
                                 ticket_data_item['type'],
                                 ticket_data_item['sla_target_due_dt_obj'],
                                 FR_SLA_CRITICAL_HOURS, FR_SLA_WARNING_HOURS
                             )
                             ticket_data_item['sla_text'], ticket_data_item['sla_class'] = sla_text_fr, sla_class_fr
-                        else: # Not update breached, IS in Open/UpdateNeeded, AND FR is met
-                            ticket_data_item['sla_text'] = f"{current_status_text} (FR Met)"
+                        else: # FR Met
+                            ticket_data_item['sla_text'] = f"{original_status_text} (FR Met)" # Use original_status_text here
                             ticket_data_item['sla_class'] = "sla-responded"
                         list_section1_items.append(ticket_data_item)
 
                     elif ticket_data_item['status_raw'] == WAITING_ON_AGENT_STATUS_ID:
-                        # Not update breached, IS Waiting on Agent
+                        # Section 2: Waiting on Agent AND NOT update breached
                         ticket_data_item['sla_text'] = f"Waiting on Agent ({ticket_data_item['updated_friendly']})"
                         ticket_data_item['sla_class'] = "sla-warning"
                         list_section2_items.append(ticket_data_item)
                     else:
-                        # Not update breached, Other statuses
+                        # Section 3: Other statuses AND NOT update breached
                         if ticket_data_item['status_raw'] == WAITING_ON_CUSTOMER_STATUS_ID:
                             ticket_data_item['sla_text'] = "Waiting on Customer"
                             if ticket_data_item['agent_responded_friendly'] != 'N/A':
@@ -317,29 +315,29 @@ def load_and_process_tickets(current_ticket_type_filter):
                         elif ticket_data_item['status_raw'] == ON_HOLD_STATUS_ID:
                             ticket_data_item['sla_text'] = f"On Hold ({ticket_data_item['updated_friendly']})"
                             ticket_data_item['sla_class'] = "sla-none"
-                        # Default sla_text and sla_class were already set if no specific condition met for these "other" statuses
+                        # else default sla_text and sla_class already set based on original_status_text
                         list_section3_items.append(ticket_data_item)
-                # --- END MODIFIED: Categorization Logic ---
+                # --- END REVISED: Categorization Logic ---
 
             except json.JSONDecodeError:
                 app.logger.error(f"JSON decode error for {filename}")
             except Exception as e:
                 app.logger.error(f"Error processing {filename}: {e}", exc_info=True)
 
+    # --- REVISED: Sort key for Section 1 ---
     list_section1_items.sort(key=lambda i: (
-        i['_sort_is_update_breached'],
-        i['_sort_priority'],
-        i['_sort_neg_time_since_update'],
-        i['_sort_needs_fr'],
-        i['_sort_fr_sla_metric']
+        i['_sort_needs_fr'],            # Needs FR (0) comes before FR met (1)
+        i['_sort_fr_sla_metric'],       # Urgency of FR SLA (lower is more urgent)
+        i['_sort_priority'],            # Then by ticket priority (Urgent 0)
+        i['_sort_neg_time_since_update']# Finally by update age (older first)
     ))
 
+    # Sort key for Section 2 (contains update-breached and non-breached WoA)
+    # and Section 3 (non-breached other)
     common_sort_key = lambda i: (
-        # Note: tickets in S2 & S3 by definition have _sort_is_update_breached = 1 (False)
-        # So this first key doesn't differentiate them much but is kept for consistency.
-        i['_sort_is_update_breached'],
-        i['_sort_priority'],
-        i['_sort_neg_time_since_update']
+        i['_sort_is_update_breached'], # Update breached (0) comes before non-breached (1)
+        i['_sort_priority'],           # Then by ticket priority
+        i['_sort_neg_time_since_update']# Then by update age / overdue duration
     )
     list_section2_items.sort(key=common_sort_key)
     list_section3_items.sort(key=common_sort_key)
@@ -413,14 +411,14 @@ def dashboard_typed(ticket_type_slug):
     generated_time_utc = datetime.datetime.now(datetime.timezone.utc)
     dashboard_generated_time_iso = generated_time_utc.isoformat()
 
-    section1_name = "Open Incidents"
-    section2_name = "Incidents Waiting on Agent"
-    section3_name = "Other Active Incidents"
+    section1_name = "Open Incidents" # Or "Open Items"
+    section2_name = "Needs Agent / Update Overdue" # MODIFIED Name to reflect content
+    section3_name = "Other Active Incidents" # Or "Other Active Items"
     page_title_type = "Incident"
 
     if current_ticket_type == TICKET_TYPE_SERVICE_REQUEST:
         section1_name = "Pending Service Requests"
-        section2_name = "Service Requests Waiting on Agent"
+        section2_name = "SRs Needing Agent / Update Overdue" # MODIFIED Name
         section3_name = "Other Active Service Requests"
         page_title_type = "Service Request"
 
@@ -456,13 +454,25 @@ def api_tickets(ticket_type_slug):
 
     s1_items, s2_items, s3_items = load_and_process_tickets(current_ticket_type)
 
+    # Determine display names for sections based on ticket type for API response consistency
+    section1_name_api = "Open Incidents"
+    section2_name_api = "Needs Agent / Update Overdue"
+    section3_name_api = "Other Active Incidents"
+    if current_ticket_type == TICKET_TYPE_SERVICE_REQUEST:
+        section1_name_api = "Pending Service Requests"
+        section2_name_api = "SRs Needing Agent / Update Overdue"
+        section3_name_api = "Other Active Service Requests"
+
     response_data = {
         's1_items': s1_items,
         's2_items': s2_items,
         's3_items': s3_items,
         'total_active_items': len(s1_items) + len(s2_items) + len(s3_items),
         'dashboard_generated_time_iso': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        'ticket_type': current_ticket_type
+        'ticket_type': current_ticket_type,
+        'section1_name_js': section1_name_api, # Pass updated name to JS if it sets headers
+        'section2_name_js': section2_name_api,
+        'section3_name_js': section3_name_api
     }
     app.logger.debug(f"API: Returning {response_data['total_active_items']} total items for type {current_ticket_type}.")
     return jsonify(response_data)
