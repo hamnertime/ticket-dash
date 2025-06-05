@@ -58,6 +58,16 @@ app.logger.addHandler(handler)
 AGENT_MAPPING = {}
 REQUESTER_MAPPING = {}
 
+# --- NEW: SLA Update Thresholds ---
+# Based on Priority ID: Max time since last update
+# 4: Urgent, 3: High, 2: Medium, 1: Low
+SLA_UPDATE_THRESHOLDS = {
+    4: datetime.timedelta(minutes=30),  # Urgent
+    3: datetime.timedelta(days=2),    # High
+    2: datetime.timedelta(days=3),    # Medium
+    1: datetime.timedelta(days=4),    # Low
+}
+
 def load_mapping_file(file_path, item_type_name="item"):
     mapping = {}
     if not os.path.exists(file_path):
@@ -95,24 +105,22 @@ def parse_datetime_utc(dt_str):
         return None
 
 def get_fr_sla_details(ticket_type, target_due_dt, critical_threshold_hours, warning_threshold_hours):
-    # FR SLA might be more relevant for Incidents. Service Requests might use overall 'due_by'.
-    # For now, keep generic, but this could be customized.
-    sla_prefix = "FR" # Default to First Response
+    sla_prefix = "FR"
     if ticket_type == TICKET_TYPE_SERVICE_REQUEST:
-        sla_prefix = "Due" # Or "Resolution" - depends on what `fr_due_by` means for SRs in Freshservice
+        sla_prefix = "Due"
 
     if not target_due_dt:
-        return f"No {sla_prefix} Due Date", "sla-none", float('inf') - 1000 # Sort key
+        return f"No {sla_prefix} Due Date", "sla-none", float('inf') - 1000
 
     now_utc = datetime.datetime.now(datetime.timezone.utc)
     time_diff_seconds = (target_due_dt - now_utc).total_seconds()
     hours_remaining_for_status = time_diff_seconds / 3600.0
 
-    if abs(time_diff_seconds) >= (2 * 24 * 60 * 60): # 2 days
+    if abs(time_diff_seconds) >= (2 * 24 * 60 * 60):
         unit, formatted_value = "days", f"{hours_remaining_for_status / 24.0:.1f}"
-    elif abs(time_diff_seconds) >= (60 * 60): # 1 hour
+    elif abs(time_diff_seconds) >= (60 * 60):
         unit, formatted_value = "hours", f"{hours_remaining_for_status:.1f}"
-    elif abs(time_diff_seconds) >= 60: # 1 minute
+    elif abs(time_diff_seconds) >= 60:
         unit, formatted_value = "min", f"{time_diff_seconds / 60.0:.0f}"
     else:
         unit, formatted_value = "sec", f"{time_diff_seconds:.0f}"
@@ -130,27 +138,19 @@ def get_fr_sla_details(ticket_type, target_due_dt, critical_threshold_hours, war
     return sla_text, sla_class, hours_remaining_for_status
 
 
-def get_status_text(status_id, ticket_type=""): # ticket_type can be used for more specific status text if needed
-    # These are common Freshservice statuses. They might apply to both Incidents and SRs,
-    # or SRs might have more specific ones like "Fulfilled", "Cancelled".
+def get_status_text(status_id, ticket_type=""):
     status_map = {
         OPEN_STATUS_ID: "Open",
         PENDING_STATUS_ID: "Pending",
-        8: "Scheduled", # Might be custom
+        8: "Scheduled",
         WAITING_ON_CUSTOMER_STATUS_ID: "Waiting on Customer",
-        10: "Waiting on Third Party", # Might be custom
-        13: "Under Investigation", # Likely Incident specific
-        19: "Update Needed",       # <-- ADD THIS LINE (using 19 directly or UPDATE_NEEDED_STATUS_ID if defined)
+        10: "Waiting on Third Party",
+        13: "Under Investigation",
+        UPDATE_NEEDED_STATUS_ID: "Update Needed",
         ON_HOLD_STATUS_ID: "On Hold",
         WAITING_ON_AGENT_STATUS_ID: "Waiting on Agent",
-        # Add Service Request specific statuses if known, e.g.:
-        # 4: "Resolved", # If used for SRs
-        # 5: "Closed",   # If used for SRs
-        # 20: "Request Fulfilled" # Example
     }
     default_text = f"Unknown Status ({status_id})"
-    # if ticket_type == TICKET_TYPE_SERVICE_REQUEST and status_id == OPEN_STATUS_ID:
-    #     return "Pending" # Example: "Open" for Incident might mean "Pending" for SR
     return status_map.get(status_id, default_text)
 
 
@@ -184,13 +184,15 @@ def days_since(dt_object, default="N/A"):
 
 def load_and_process_tickets(current_ticket_type_filter):
     global AGENT_MAPPING, REQUESTER_MAPPING
-    list_section1_items = [] # e.g., Open Incidents / Pending SRs needing FR/Due attention
-    list_section2_items = [] # e.g., Waiting on Agent
-    list_section3_items = [] # Other active tickets
+    list_section1_items = []
+    list_section2_items = []
+    list_section3_items = []
 
     if not os.path.isdir(TICKETS_DIR):
         app.logger.error(f"Data directory '{TICKETS_DIR}' not found.")
         return [], [], []
+
+    now_utc = datetime.datetime.now(datetime.timezone.utc) # --- MODIFIED: Get now_utc once ---
 
     for filename in os.listdir(TICKETS_DIR):
         if filename.endswith(".txt") and filename[:-4].isdigit():
@@ -201,7 +203,7 @@ def load_and_process_tickets(current_ticket_type_filter):
 
                 ticket_type_from_file = data.get('type', 'Unknown')
                 if ticket_type_from_file != current_ticket_type_filter:
-                    continue # Skip if not the type we are currently displaying
+                    continue
 
                 ticket_data_item = {
                     'id': data.get('id', int(filename[:-4])),
@@ -211,8 +213,8 @@ def load_and_process_tickets(current_ticket_type_filter):
                     'status_raw': data.get('status'),
                     'priority_raw': data.get('priority'),
                     'description_text': data.get('description_text', ''),
-                    'fr_due_by_str': data.get('fr_due_by'), # May represent 'due_by' for SRs
-                    'due_by_str': data.get('due_by'), # Actual resolution due date, more common for SRs
+                    'fr_due_by_str': data.get('fr_due_by'),
+                    'due_by_str': data.get('due_by'),
                     'updated_at_str': data.get('updated_at'),
                     'created_at_str': data.get('created_at'),
                     'type': ticket_type_from_file,
@@ -228,76 +230,102 @@ def load_and_process_tickets(current_ticket_type_filter):
                 requester_id_from_item = ticket_data_item.get('requester_id')
                 ticket_data_item['requester_name'] = REQUESTER_MAPPING.get(requester_id_from_item, f"Req. ID: {requester_id_from_item}") if requester_id_from_item else 'N/A'
 
-                # Use 'due_by_str' for Service Requests if 'fr_due_by_str' is not primary for them.
-                # For simplicity, we'll use fr_due_by for SLA logic for now, but this can be refined.
-                # If 'due_by_str' (resolution due) is more relevant for SRs, use that for sla_target_due_dt
                 sla_target_due_dt_str = ticket_data_item['fr_due_by_str']
                 if ticket_data_item['type'] == TICKET_TYPE_SERVICE_REQUEST and ticket_data_item['due_by_str']:
-                     # Potentially prioritize 'due_by' for SRs if it's the main SLA driver
-                     # sla_target_due_dt_str = ticket_data_item['due_by_str']
-                     pass # For now, keep fr_due_by consistent for SLA logic below
+                     pass
 
-                ticket_data_item['sla_target_due_dt'] = parse_datetime_utc(sla_target_due_dt_str)
-                ticket_data_item['updated_at_dt'] = parse_datetime_utc(ticket_data_item['updated_at_str'])
-                ticket_data_item['created_at_dt'] = parse_datetime_utc(ticket_data_item['created_at_str'])
-                ticket_data_item['first_responded_at_dt'] = parse_datetime_utc(ticket_data_item['first_responded_at_iso'])
-                ticket_data_item['agent_responded_at_dt'] = parse_datetime_utc(ticket_data_item['stats'].get('agent_responded_at'))
+                # --- MODIFIED: Store datetime objects directly for calculations ---
+                ticket_data_item['sla_target_due_dt_obj'] = parse_datetime_utc(sla_target_due_dt_str)
+                ticket_data_item['updated_at_dt_obj'] = parse_datetime_utc(ticket_data_item['updated_at_str'])
+                ticket_data_item['created_at_dt_obj'] = parse_datetime_utc(ticket_data_item['created_at_str'])
+                ticket_data_item['first_responded_at_dt_obj'] = parse_datetime_utc(ticket_data_item['first_responded_at_iso'])
+                ticket_data_item['agent_responded_at_dt_obj'] = parse_datetime_utc(ticket_data_item['stats'].get('agent_responded_at'))
+
 
                 ticket_data_item['priority_text'] = get_priority_text(ticket_data_item['priority_raw'])
-                ticket_data_item['updated_friendly'] = time_since(ticket_data_item['updated_at_dt'])
-                ticket_data_item['created_days_old'] = days_since(ticket_data_item['created_at_dt'])
-                ticket_data_item['agent_responded_friendly'] = time_since(ticket_data_item['agent_responded_at_dt'])
-                item_updated_timestamp = ticket_data_item['updated_at_dt'].timestamp() if ticket_data_item['updated_at_dt'] else 0.0
+                ticket_data_item['updated_friendly'] = time_since(ticket_data_item['updated_at_dt_obj'])
+                ticket_data_item['created_days_old'] = days_since(ticket_data_item['created_at_dt_obj'])
+                ticket_data_item['agent_responded_friendly'] = time_since(ticket_data_item['agent_responded_at_dt_obj'])
+                # item_updated_timestamp = ticket_data_item['updated_at_dt_obj'].timestamp() if ticket_data_item['updated_at_dt_obj'] else 0.0
 
                 current_status_text = get_status_text(ticket_data_item['status_raw'], ticket_data_item['type'])
                 ticket_data_item['status_text'] = current_status_text
                 ticket_data_item['sla_text'] = f"{current_status_text} ({ticket_data_item['updated_friendly']})"
-                ticket_data_item['sla_class'] = "sla-in-progress" # Default
+                ticket_data_item['sla_class'] = "sla-in-progress"
 
-                # Section 1: Items requiring first response / initial action (Open Incidents, Pending SRs)
-                # OPEN_STATUS_ID for incidents, PENDING_STATUS_ID or OPEN_STATUS_ID for SRs might be relevant here.
-                # This logic needs to be flexible for both types.
-                # For Incidents, fr_due_by is key. For SRs, fr_due_by or due_by might be key.
-                section1_trigger_statuses = [OPEN_STATUS_ID, UPDATE_NEEDED_STATUS_ID] # Added UPDATE_NEEDED_STATUS_ID
+                # --- NEW: Update SLA Breach Calculation and Sort Key Components ---
+                priority_raw = ticket_data_item.get('priority_raw')
+                updated_at_dt = ticket_data_item['updated_at_dt_obj']
+
+                is_update_sla_breached = False
+                time_since_update_seconds = float('inf') # Sort non-updated tickets last if no date
+                if updated_at_dt:
+                    time_diff_since_update = now_utc - updated_at_dt
+                    time_since_update_seconds = time_diff_since_update.total_seconds()
+                    update_sla_threshold_for_priority = SLA_UPDATE_THRESHOLDS.get(priority_raw)
+                    if update_sla_threshold_for_priority and time_diff_since_update > update_sla_threshold_for_priority:
+                        is_update_sla_breached = True
+
+                ticket_data_item['_sort_is_update_breached'] = 0 if is_update_sla_breached else 1 # Breached (0) comes first
+                ticket_data_item['_sort_priority'] = (4 - priority_raw) if priority_raw else 4 # Urgent (0) comes first
+                ticket_data_item['_sort_neg_time_since_update'] = -time_since_update_seconds # Older (more negative) comes first
+
+                # FR SLA Sort Components (for section 1, non-update-breached)
+                needs_fr = ticket_data_item['first_responded_at_dt_obj'] is None
+                ticket_data_item['_sort_needs_fr'] = 0 if needs_fr else 1 # Needs FR (0) comes first
+
+                fr_sla_metric = float('inf') # Default for FR met or not applicable
+                if needs_fr:
+                     _, _, fr_hours_remaining = get_fr_sla_details(
+                        ticket_data_item['type'],
+                        ticket_data_item['sla_target_due_dt_obj'],
+                        FR_SLA_CRITICAL_HOURS, FR_SLA_WARNING_HOURS
+                    )
+                     fr_sla_metric = fr_hours_remaining # Lower is more urgent
+                ticket_data_item['_sort_fr_sla_metric'] = fr_sla_metric
+                # --- END NEW: Sort Key Components ---
+
+                section1_trigger_statuses = [OPEN_STATUS_ID, UPDATE_NEEDED_STATUS_ID]
                 if ticket_data_item['type'] == TICKET_TYPE_SERVICE_REQUEST:
-                    section1_trigger_statuses.append(PENDING_STATUS_ID) # SRs might be "Pending" but need action
+                    section1_trigger_statuses.append(PENDING_STATUS_ID)
 
                 if ticket_data_item['status_raw'] in section1_trigger_statuses:
-                    # For Incidents, if not first responded, show FR SLA.
-                    # For Service Requests, if not first responded (if applicable) or overall due_by is approaching.
-                    # We use 'first_responded_at_dt' as a common check.
-                    if ticket_data_item['first_responded_at_dt'] is None: # or check based on SR specific fields
-                        sla_text, sla_class, sla_sort_key = get_fr_sla_details(
+                    if needs_fr and not is_update_sla_breached: # Show FR SLA text only if not update breached and needs FR
+                        sla_text_fr, sla_class_fr, _ = get_fr_sla_details(
                             ticket_data_item['type'],
-                            ticket_data_item['sla_target_due_dt'],
+                            ticket_data_item['sla_target_due_dt_obj'],
                             FR_SLA_CRITICAL_HOURS, FR_SLA_WARNING_HOURS
                         )
-                        ticket_data_item['sla_text'], ticket_data_item['sla_class'] = sla_text, sla_class
-                        ticket_data_item['action_sort_key_tuple'] = (0, sla_sort_key, -item_updated_timestamp)
-                    else: # Already responded or FR not applicable/passed
-                        ticket_data_item['sla_text'] = f"{current_status_text} ({ticket_data_item['updated_friendly']})"
-                        ticket_data_item['sla_class'] = "sla-responded" # Or some other appropriate class
-                        ticket_data_item['action_sort_key_tuple'] = (1, -item_updated_timestamp, 0)
+                        ticket_data_item['sla_text'], ticket_data_item['sla_class'] = sla_text_fr, sla_class_fr
+                    elif is_update_sla_breached: # Explicitly mark update breached tickets visually
+                        ticket_data_item['sla_text'] = f"Update Overdue ({ticket_data_item['updated_friendly']})"
+                        ticket_data_item['sla_class'] = "sla-critical" # Or a new class for update overdue
+                    else: # Responded, not update breached
+                        ticket_data_item['sla_text'] = f"{current_status_text} (FR Met)"
+                        ticket_data_item['sla_class'] = "sla-responded"
                     list_section1_items.append(ticket_data_item)
 
                 elif ticket_data_item['status_raw'] == WAITING_ON_AGENT_STATUS_ID:
-                    ticket_data_item['sla_text'] = f"Waiting on Agent ({ticket_data_item['updated_friendly']})"
-                    ticket_data_item['sla_class'] = "sla-warning" # Or a color indicating agent action needed
-                    ticket_data_item['action_sort_key'] = item_updated_timestamp
+                    if is_update_sla_breached:
+                        ticket_data_item['sla_text'] = f"Update Overdue (Waiting Agent, {ticket_data_item['updated_friendly']})"
+                        ticket_data_item['sla_class'] = "sla-critical"
+                    else:
+                        ticket_data_item['sla_text'] = f"Waiting on Agent ({ticket_data_item['updated_friendly']})"
+                        ticket_data_item['sla_class'] = "sla-warning"
                     list_section2_items.append(ticket_data_item)
 
-                else: # Other active statuses (Waiting on Customer, On Hold, etc.)
-                    if ticket_data_item['status_raw'] == WAITING_ON_CUSTOMER_STATUS_ID:
+                else:
+                    if is_update_sla_breached:
+                        ticket_data_item['sla_text'] = f"Update Overdue ({current_status_text}, {ticket_data_item['updated_friendly']})"
+                        ticket_data_item['sla_class'] = "sla-critical"
+                    elif ticket_data_item['status_raw'] == WAITING_ON_CUSTOMER_STATUS_ID:
                         ticket_data_item['sla_text'] = "Waiting on Customer"
                         if ticket_data_item['agent_responded_friendly'] != 'N/A':
                             ticket_data_item['sla_text'] += f" (Agent: {ticket_data_item['agent_responded_friendly']})"
-                        ticket_data_item['sla_class'] = "sla-responded" # Or "sla-customer-reply"
+                        ticket_data_item['sla_class'] = "sla-responded"
                     elif ticket_data_item['status_raw'] == ON_HOLD_STATUS_ID:
                         ticket_data_item['sla_text'] = f"On Hold ({ticket_data_item['updated_friendly']})"
                         ticket_data_item['sla_class'] = "sla-none"
-                    # Add more else-if for other statuses relevant to section 3
-
-                    ticket_data_item['action_sort_key'] = item_updated_timestamp
                     list_section3_items.append(ticket_data_item)
 
             except json.JSONDecodeError:
@@ -305,21 +333,42 @@ def load_and_process_tickets(current_ticket_type_filter):
             except Exception as e:
                 app.logger.error(f"Error processing {filename}: {e}", exc_info=True)
 
-    # Sort each list
-    list_section1_items.sort(key=lambda i: i.get('action_sort_key_tuple', (2, float('inf'), 0)))
-    list_section2_items.sort(key=lambda i: i.get('action_sort_key', float('inf')))
-    list_section3_items.sort(key=lambda i: i.get('action_sort_key', float('inf')))
+    # --- MODIFIED: Sorting Logic ---
+    list_section1_items.sort(key=lambda i: (
+        i['_sort_is_update_breached'],      # Breached updates first (0)
+        i['_sort_priority'],                # Then by priority (Urgent 0)
+        # For breached, neg_time_since_update makes more overdue ones first
+        # For non-breached, this also applies after FR logic
+        i['_sort_neg_time_since_update'] if i['_sort_is_update_breached'] == 0 else float('-inf'), # Sort breached by age
+        i['_sort_needs_fr'],                # Then by whether it needs FR (Needs FR 0)
+        i['_sort_fr_sla_metric'],           # Then by FR SLA urgency (lower is more urgent)
+        i['_sort_neg_time_since_update'] if i['_sort_is_update_breached'] == 1 else float('-inf') # Sort non-breached by age after FR
+    ))
+
+    common_sort_key = lambda i: (
+        i['_sort_is_update_breached'],
+        i['_sort_priority'],
+        i['_sort_neg_time_since_update']
+    )
+    list_section2_items.sort(key=common_sort_key)
+    list_section3_items.sort(key=common_sort_key)
+    # --- END MODIFIED: Sorting Logic ---
 
     # Clean up temporary datetime objects and sort keys before sending to template/JSON
     for ticket_list in [list_section1_items, list_section2_items, list_section3_items]:
         for item_data in ticket_list:
-            item_data.pop('sla_target_due_dt', None)
-            item_data.pop('updated_at_dt', None)
-            item_data.pop('created_at_dt', None)
-            item_data.pop('first_responded_at_dt', None)
-            item_data.pop('agent_responded_at_dt', None)
-            item_data.pop('action_sort_key_tuple', None)
-            item_data.pop('action_sort_key', None)
+            item_data.pop('sla_target_due_dt_obj', None)
+            item_data.pop('updated_at_dt_obj', None)
+            item_data.pop('created_at_dt_obj', None)
+            item_data.pop('first_responded_at_dt_obj', None)
+            item_data.pop('agent_responded_at_dt_obj', None)
+            # --- MODIFIED: Pop new sort keys ---
+            item_data.pop('_sort_is_update_breached', None)
+            item_data.pop('_sort_priority', None)
+            item_data.pop('_sort_neg_time_since_update', None)
+            item_data.pop('_sort_needs_fr', None)
+            item_data.pop('_sort_fr_sla_metric', None)
+
 
     return list_section1_items, list_section2_items, list_section3_items
 
@@ -376,14 +425,13 @@ def dashboard_typed(ticket_type_slug):
     generated_time_utc = datetime.datetime.now(datetime.timezone.utc)
     dashboard_generated_time_iso = generated_time_utc.isoformat()
 
-    # Determine display names for sections based on ticket type
     section1_name = "Open Incidents"
     section2_name = "Incidents Waiting on Agent"
     section3_name = "Other Active Incidents"
     page_title_type = "Incident"
 
     if current_ticket_type == TICKET_TYPE_SERVICE_REQUEST:
-        section1_name = "Pending Service Requests" # Or "Open SRs Needing Action"
+        section1_name = "Pending Service Requests"
         section2_name = "Service Requests Waiting on Agent"
         section3_name = "Other Active Service Requests"
         page_title_type = "Service Request"
@@ -403,7 +451,6 @@ def dashboard_typed(ticket_type_slug):
                             section1_name=section1_name,
                             section2_name=section2_name,
                             section3_name=section3_name,
-                            # Pass status IDs if needed by template, though JS might handle this based on type
                             OPEN_STATUS_ID=OPEN_STATUS_ID,
                             PENDING_STATUS_ID=PENDING_STATUS_ID,
                             WAITING_ON_CUSTOMER_STATUS_ID=WAITING_ON_CUSTOMER_STATUS_ID,
@@ -450,7 +497,7 @@ if __name__ == '__main__':
                 app.logger.info(f"Created directory at {abs_dir_path}.")
             except OSError as e:
                 app.logger.error(f"Failed to create directory {abs_dir_path}: {e}")
-                if dir_path in [templates_dir, STATIC_DIR]: # Essential for Flask
+                if dir_path in [templates_dir, STATIC_DIR]:
                      exit(f"Error: Could not create essential directory {abs_dir_path}. Exiting.")
 
     AGENT_MAPPING = load_mapping_file(AGENTS_FILE, "agent")
@@ -483,6 +530,7 @@ if __name__ == '__main__':
 
     app.logger.info(f"Starting Flask app. Data directory: '{os.path.abspath(TICKETS_DIR)}'")
     app.logger.info(f"FR SLA Critical: < {FR_SLA_CRITICAL_HOURS} hrs, Warning: < {FR_SLA_WARNING_HOURS} hrs.")
+    app.logger.info(f"Update SLA Thresholds: { {p: str(t) for p, t in SLA_UPDATE_THRESHOLDS.items()} }") # --- MODIFIED: Log new SLAs ---
     app.logger.info(f"Supported ticket types: {SUPPORTED_TICKET_TYPES}")
 
 
@@ -508,7 +556,7 @@ if __name__ == '__main__':
         app.logger.info(f"Falling back to HTTP on port {port}.")
 
     app.logger.info(f"Dashboard will be available at {protocol}://localhost:{port}/")
-    if port == 443 and os.name != 'nt' and not use_https: # Warn if trying HTTP on 443 without intending HTTPS
+    if port == 443 and os.name != 'nt' and not use_https:
          app.logger.warning("Running on port 443 without HTTPS. This is unusual. Ensure `authbind` is used if not running as root.")
     elif port == 443 and os.name != 'nt' and use_https:
         app.logger.info("If not running as root, ensure `authbind --deep python3 gui.py` is used for port 443.")
