@@ -3,34 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integotec - {{ page_title_type }} Dashboard</title>
+    <title>Integotec - {{ page_title_display }} Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script>
         window.FRESHSERVICE_BASE_URL = "{{ freshservice_base_url }}";
         window.AUTO_REFRESH_MS = {{ auto_refresh_ms }};
-        window.CURRENT_TICKET_TYPE_SLUG = "{{ current_ticket_type_slug }}";
-        window.CURRENT_TICKET_TYPE_DISPLAY = "{{ current_ticket_type_display }}";
-        // Constants for status IDs can be passed if JS needs them for specific logic,
-        // but much of the display logic is now handled by Flask before rendering.
-        // window.OPEN_STATUS_ID = {{ OPEN_STATUS_ID }};
-        // window.PENDING_STATUS_ID = {{ PENDING_STATUS_ID }};
+        window.CURRENT_TICKET_TYPE_SLUG = "{{ current_view_slug }}"; // Now holds 'helpdesk' or 'professional-services'
+        window.CURRENT_TICKET_TYPE_DISPLAY = "{{ current_view_display }}"; // Now holds 'Helpdesk' or 'Professional Services'
     </script>
 </head>
 <body>
     <div class="container">
-        <h1>Integotec - {{ page_title_type }} Dashboard</h1>
+        <h1>Integotec - {{ page_title_display }} Dashboard</h1>
 
         <div class="info-bar">
             <div class="ticket-type-switcher">
                 <span>View:</span>
-                {% for slug, display_name in supported_ticket_types.items() %}
-                    <a href="{{ url_for('dashboard_typed', ticket_type_slug=slug) }}"
-                       class="type-switch-button {% if slug == current_ticket_type_slug %}active{% endif %}">
-                        {{ display_name }}s
+                {% for slug, display_name in supported_views.items() %}
+                    <a href="{{ url_for('dashboard_typed', view_slug=slug) }}"
+                       class="type-switch-button {% if slug == current_view_slug %}active{% endif %}">
+                        {{ display_name }}
                     </a>
                 {% endfor %}
             </div>
-            <span>Total Active {{ current_ticket_type_display }}s: <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length }}</strong></span>
+            <span>Total Active Tickets: <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length }}</strong></span>
             <span>Dashboard Generated: <em id="dashboard-generated-time">Loading...</em></span>
             <button id="theme-toggle">Toggle Theme</button>
         </div>
@@ -61,8 +57,6 @@
                         <td><span class="priority-{{ item.priority_text }}">{{ item.priority_text }}</span></td>
                         <td class="col-action-sla">
                             <span class="sla-status-text {{ item.sla_class }}">{{ item.sla_text }}</span>
-                            {# FR Due date display for items that haven't been first responded to and have an FR due date #}
-                            {# This logic might need to be adjusted based on how fr_due_by applies to Service Requests #}
                             {% if item.first_responded_at_iso is none and item.fr_due_by_str %}
                                 <div class="datetime-container" data-utc-datetime="{{ item.fr_due_by_str }}" data-prefix="FR Due: ">
                                     <small class="local-datetime">Loading...</small>
@@ -80,7 +74,7 @@
                 {% endif %}
             </tbody>
         </table>
-        <p id="s1-no-items-message" class="no-items-message" {% if s1_items %}style="display: none;"{% endif %}>No {{ current_ticket_type_display | lower }}s currently in this category.</p>
+        <p id="s1-no-items-message" class="no-items-message" {% if s1_items %}style="display: none;"{% endif %}>No tickets currently in this category.</p>
 
         {# --- Section 2: Waiting on Agent --- #}
         <div class="section-header" id="s2-header">{{ section2_name }} (<span id="s2-item-count">{{ s2_items|length }}</span>)</div>
@@ -116,7 +110,7 @@
                 {% endif %}
             </tbody>
         </table>
-        <p id="s2-no-items-message" class="no-items-message" {% if s2_items %}style="display: none;"{% endif %}>No {{ current_ticket_type_display | lower }}s currently 'Waiting on Agent'.</p>
+        <p id="s2-no-items-message" class="no-items-message" {% if s2_items %}style="display: none;"{% endif %}>No tickets currently in this category.</p>
 
         {# --- Section 3: Remaining Active Items --- #}
         <div class="section-header" id="s3-header">{{ section3_name }} (<span id="s3-item-count">{{ s3_items|length }}</span>)</div>
@@ -152,7 +146,7 @@
                 {% endif %}
             </tbody>
         </table>
-        <p id="s3-no-items-message" class="no-items-message" {% if s3_items %}style="display: none;"{% endif %}>No other active {{ current_ticket_type_display | lower }}s found.</p>
+        <p id="s3-no-items-message" class="no-items-message" {% if s3_items %}style="display: none;"{% endif %}>No other active tickets found in this category.</p>
     </div>
 
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
