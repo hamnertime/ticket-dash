@@ -406,12 +406,63 @@ def api_tickets(view_slug):
     return jsonify(response_data)
 
 
-# ... (rest of the file is unchanged)
 if __name__ == '__main__':
-    # Startup logic remains the same
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # ...
+    templates_dir = os.path.join(script_dir, 'templates')
+
+    for dir_path in [TICKETS_DIR, templates_dir, STATIC_DIR]:
+        abs_dir_path = os.path.abspath(dir_path)
+        if not os.path.exists(abs_dir_path):
+            try:
+                os.makedirs(abs_dir_path)
+                app.logger.info(f"Created directory at {abs_dir_path}.")
+            except OSError as e:
+                app.logger.error(f"Failed to create directory {abs_dir_path}: {e}")
+                if dir_path in [templates_dir, STATIC_DIR]:
+                     exit(f"Error: Could not create essential directory {abs_dir_path}. Exiting.")
+
+    AGENT_MAPPING = load_mapping_file(AGENTS_FILE, "agent")
+    if not AGENT_MAPPING: app.logger.warning(f"Agent mapping from '{AGENTS_FILE}' is empty or failed to load.")
+    REQUESTER_MAPPING = load_mapping_file(REQUESTERS_FILE, "requester")
+    if not REQUESTER_MAPPING: app.logger.warning(f"Requester mapping from '{REQUESTERS_FILE}' is empty or failed to load.")
+
+    app.logger.info(f"Starting Flask app. Data directory: '{os.path.abspath(TICKETS_DIR)}'")
+    app.logger.info(f"FR SLA Critical: < {FR_SLA_CRITICAL_HOURS} hrs, Warning: < {FR_SLA_WARNING_HOURS} hrs.")
+    app.logger.info(f"Update SLA Thresholds: { {p: str(t) for p, t in SLA_UPDATE_THRESHOLDS.items()} }")
+    app.logger.info(f"Supported views: {SUPPORTED_VIEWS}")
+
+    cert_path = os.path.abspath(SSL_CERT_FILE)
+    key_path = os.path.abspath(SSL_KEY_FILE)
+    cert_exists = os.path.exists(cert_path)
+    key_exists = os.path.exists(key_path)
+
+    if not cert_exists: app.logger.warning(f"SSL certificate file not found at: {cert_path}")
+    if not key_exists: app.logger.warning(f"SSL private key file not found at: {key_path}")
+
+    use_https = cert_exists and key_exists
+    protocol = "https" if use_https else "http"
+    # --- PORT CHANGE HERE ---
+    port = 6969 if use_https else 5001
+    ssl_context = (cert_path, key_path) if use_https else None
+
+    if use_https:
+        app.logger.info(f"Attempting to start HTTPS server on port {port}.")
+        app.logger.info(f"Using SSL certificate: {cert_path}")
+        app.logger.info(f"Using SSL private key: {key_path}")
+    else:
+        app.logger.info("SSL certificate or key file missing.")
+        app.logger.info(f"Falling back to HTTP on port {port}.")
+
+    app.logger.info(f"Dashboard will be available at {protocol}://localhost:{port}/")
+
+    # The check for authbind is no longer necessary for ports > 1024
+    # but we'll leave the general error handling.
     try:
-        app.run(host='0.0.0.0', port=5001, debug=False, ssl_context=None)
+        app.run(host='0.0.0.0', port=port, debug=False, ssl_context=ssl_context)
+    except OSError as e:
+        if ("Permission denied" in str(e) or "Errno 13" in str(e)) and port < 1024 and os.name != 'nt':
+            app.logger.error(f"OSError: {e}. Could not bind to port {port}. Try running with sudo or using authbind.")
+        else:
+            app.logger.error(f"OSError: {e}. Failed to start the server on port {port}.")
     except Exception as e:
         app.logger.error(f"Failed to start server: {e}", exc_info=True)
