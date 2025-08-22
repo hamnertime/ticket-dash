@@ -3,34 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integotec - {{ page_title_type }} Dashboard</title>
+    <title>Integotec - {{ page_title_display }} Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script>
         window.FRESHSERVICE_BASE_URL = "{{ freshservice_base_url }}";
         window.AUTO_REFRESH_MS = {{ auto_refresh_ms }};
-        window.CURRENT_TICKET_TYPE_SLUG = "{{ current_ticket_type_slug }}";
-        window.CURRENT_TICKET_TYPE_DISPLAY = "{{ current_ticket_type_display }}";
-        // Constants for status IDs can be passed if JS needs them for specific logic,
-        // but much of the display logic is now handled by Flask before rendering.
-        // window.OPEN_STATUS_ID = {{ OPEN_STATUS_ID }};
-        // window.PENDING_STATUS_ID = {{ PENDING_STATUS_ID }};
+        window.CURRENT_TICKET_TYPE_SLUG = "{{ current_view_slug }}";
+        window.CURRENT_TICKET_TYPE_DISPLAY = "{{ current_view_display }}";
     </script>
 </head>
 <body>
     <div class="container">
-        <h1>Integotec - {{ page_title_type }} Dashboard</h1>
+        <h1>Integotec - {{ page_title_display }} Dashboard</h1>
 
         <div class="info-bar">
             <div class="ticket-type-switcher">
                 <span>View:</span>
-                {% for slug, display_name in supported_ticket_types.items() %}
-                    <a href="{{ url_for('dashboard_typed', ticket_type_slug=slug) }}"
-                       class="type-switch-button {% if slug == current_ticket_type_slug %}active{% endif %}">
+                {% for slug, display_name in supported_views.items() %}
+                    <a href="{{ url_for('dashboard_typed', view_slug=slug) }}"
+                       class="type-switch-button {% if slug == current_view_slug %}active{% endif %}">
                         {{ display_name }}s
                     </a>
                 {% endfor %}
             </div>
-            <span>Total Active {{ current_ticket_type_display }}s: <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length }}</strong></span>
+            <span>Total Active {{ current_view_display }}s: <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length }}</strong></span>
             <span>Dashboard Generated: <em id="dashboard-generated-time">Loading...</em></span>
             <button id="theme-toggle">Toggle Theme</button>
         </div>
