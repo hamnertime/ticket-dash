@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             noItemsMessageElement.style.display = 'block'; // Show "no items" message
             tableElement.style.display = 'none'; // Hide table
             // Ensure the message reflects the current item type
-            noItemsMessageElement.textContent = `No ${CURRENT_TICKET_TYPE_DISPLAY.toLowerCase()}s currently in this category.`;
+            noItemsMessageElement.textContent = `No tickets currently in this category.`;
         }
         convertAllUTCToLocal(); // Re-convert dates after re-rendering new rows
     }
