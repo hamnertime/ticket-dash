@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.getElementById('theme-toggle');
     const body = document.body;
+    const agentFilter = document.getElementById('agent-filter');
 
     function applyTheme(theme) {
         if (theme === 'light') {
@@ -20,6 +21,19 @@ document.addEventListener('DOMContentLoaded', () => {
             let newTheme = body.classList.contains('light-mode') ? 'dark' : 'light';
             localStorage.setItem('theme', newTheme);
             applyTheme(newTheme);
+        });
+    }
+
+    if (agentFilter) {
+        agentFilter.addEventListener('change', () => {
+            const selectedAgentId = agentFilter.value;
+            const url = new URL(window.location);
+            if (selectedAgentId) {
+                url.searchParams.set('agent_id', selectedAgentId);
+            } else {
+                url.searchParams.delete('agent_id');
+            }
+            window.location.href = url.toString();
         });
     }
 
@@ -151,7 +165,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function refreshTicketData() {
         try {
-            const response = await fetch(`/api/tickets/${CURRENT_TICKET_TYPE_SLUG}`);
+            const url = new URL(`/api/tickets/${CURRENT_TICKET_TYPE_SLUG}`, window.location.origin);
+            const selectedAgentId = new URLSearchParams(window.location.search).get('agent_id');
+            if (selectedAgentId) {
+                url.searchParams.set('agent_id', selectedAgentId);
+            }
+            const response = await fetch(url);
             if (!response.ok) {
                 console.error(`Failed to fetch data:`, response.status);
                 return;

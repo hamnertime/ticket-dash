@@ -1,7 +1,7 @@
 import os
 import json
 import datetime
-from flask import Flask, render_template, jsonify, abort, redirect, url_for
+from flask import Flask, render_template, jsonify, abort, redirect, url_for, request
 import ssl
 import logging
 
@@ -178,7 +178,7 @@ def days_since(dt_object, default="N/A"):
     if diff_days == 1: return "1 day old"
     return f"{diff_days} days old"
 
-def load_and_process_tickets(current_view_slug):
+def load_and_process_tickets(current_view_slug, agent_id=None):
     global AGENT_MAPPING, REQUESTER_MAPPING
     list_section1_items = []
     list_section2_items = [] # NEW: Customer Replied
@@ -197,6 +197,10 @@ def load_and_process_tickets(current_view_slug):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+
+                # Agent filtering
+                if agent_id and data.get('responder_id') != agent_id:
+                    continue
 
                 group_id = data.get('group_id')
                 is_prof_services_ticket = (group_id == PROFESSIONAL_SERVICES_GROUP_ID)
@@ -339,10 +343,12 @@ def dashboard_typed(view_slug):
     if view_slug not in SUPPORTED_VIEWS:
         abort(404, description=f"Unsupported view: {view_slug}")
 
+    agent_id = request.args.get('agent_id', type=int)
+
     current_view_display = SUPPORTED_VIEWS[view_slug]
     app.logger.info(f"Loading dashboard for view: {current_view_display} (slug: {view_slug})")
 
-    s1_items, s2_items, s3_items, s4_items = load_and_process_tickets(view_slug)
+    s1_items, s2_items, s3_items, s4_items = load_and_process_tickets(view_slug, agent_id=agent_id)
     generated_time_utc = datetime.datetime.now(datetime.timezone.utc)
     dashboard_generated_time_iso = generated_time_utc.isoformat()
 
@@ -370,7 +376,9 @@ def dashboard_typed(view_slug):
                             OPEN_STATUS_ID=OPEN_STATUS_ID,
                             PENDING_STATUS_ID=PENDING_STATUS_ID,
                             WAITING_ON_CUSTOMER_STATUS_ID=WAITING_ON_CUSTOMER_STATUS_ID,
-                            WAITING_ON_AGENT_STATUS_ID=WAITING_ON_AGENT_STATUS_ID
+                            WAITING_ON_AGENT_STATUS_ID=WAITING_ON_AGENT_STATUS_ID,
+                            agent_mapping=AGENT_MAPPING,
+                            selected_agent_id=agent_id
                            )
 
 # --- API Endpoint ---
@@ -379,10 +387,12 @@ def api_tickets(view_slug):
     if view_slug not in SUPPORTED_VIEWS:
         return jsonify({"error": f"Unsupported view: {view_slug}"}), 404
 
+    agent_id = request.args.get('agent_id', type=int)
+
     current_view_display = SUPPORTED_VIEWS[view_slug]
     app.logger.debug(f"API: /api/tickets/{view_slug} called for view: {current_view_display}")
 
-    s1_items, s2_items, s3_items, s4_items = load_and_process_tickets(view_slug)
+    s1_items, s2_items, s3_items, s4_items = load_and_process_tickets(view_slug, agent_id=agent_id)
 
     section1_name_api = f"Open {current_view_display} Tickets"
     section2_name_api = "Customer Replied"

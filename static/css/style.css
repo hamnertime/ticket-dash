@@ -152,6 +152,26 @@ margin-left: auto; /* Push to the right if space allows */
 }
 #theme-toggle:hover { opacity: 0.8; }
 
+.filter-bar {
+    padding: 10px;
+    background-color: var(--info-bar-bg);
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+
+.filter-bar label {
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+.filter-bar select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid var(--table-border);
+    background-color: var(--body-bg);
+    color: var(--body-text);
+}
+
 .section-header {
     background-color: var(--section-header-bg);
     color: var(--section-header-text);
