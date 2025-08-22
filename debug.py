@@ -9,7 +9,7 @@ TOKEN_FILE = "./token.txt"
 # Corrected domain to match your other scripts
 FRESHSERVICE_DOMAIN = "integotecllc.freshservice.com"
 BASE_URL = f"https://{FRESHSERVICE_DOMAIN}"
-TICKET_ID_TO_CHECK = 15455
+TICKET_ID_TO_CHECK = 16837
 
 # Updated Professional Services Group ID from your input
 PROFESSIONAL_SERVICES_GROUP_ID = 19000234009
