@@ -80,7 +80,7 @@
                 {% endif %}
             </tbody>
         </table>
-        <p id="s1-no-items-message" class="no-items-message" {% if s1_items %}style="display: none;"{% endif %}>No {{ current_ticket_type_display | lower }}s currently in this category.</p>
+        <p id="s1-no-items-message" class="no-items-message" {% if s1_items %}style="display: none;"{% endif %}>No tickets currently in this category.</p>
 
         {# --- Section 2: Waiting on Agent --- #}
         <div class="section-header" id="s2-header">{{ section2_name }} (<span id="s2-item-count">{{ s2_items|length }}</span>)</div>
@@ -116,7 +116,7 @@
                 {% endif %}
             </tbody>
         </table>
-        <p id="s2-no-items-message" class="no-items-message" {% if s2_items %}style="display: none;"{% endif %}>No {{ current_ticket_type_display | lower }}s currently 'Waiting on Agent'.</p>
+        <p id="s2-no-items-message" class="no-items-message" {% if s2_items %}style="display: none;"{% endif %}>No tickets currently 'Waiting on Agent'.</p>
 
         {# --- Section 3: Remaining Active Items --- #}
         <div class="section-header" id="s3-header">{{ section3_name }} (<span id="s3-item-count">{{ s3_items|length }}</span>)</div>
@@ -152,7 +152,7 @@
                 {% endif %}
             </tbody>
         </table>
-        <p id="s3-no-items-message" class="no-items-message" {% if s3_items %}style="display: none;"{% endif %}>No other active {{ current_ticket_type_display | lower }}s found.</p>
+        <p id="s3-no-items-message" class="no-items-message" {% if s3_items %}style="display: none;"{% endif %}>No other active tickets found.</p>
     </div>
 
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
