@@ -3,154 +3,341 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integotec - Ticket Dashboard</title>
+    <title>Integotec - Ticket Arcade!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        /* --- CSS styles remain the same as the previous version --- */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; background-color: #1e1e2f; color: #e0e0ff; margin: 0; padding: 15px; font-size: 14px; line-height: 1.5; }
-        .container { max-width: 98%; margin: 0 auto; }
-        h1 { text-align: center; color: #82aaff; margin-bottom: 15px; font-size: 2.2em; }
-        .info-bar { display: flex; justify-content: space-between; align-items: center; background-color: #2a2a40; padding: 8px 12px; border-radius: 6px; margin-bottom: 15px; font-size: 1.1em; }
-        .section-header { background-color: #30304a; color: #c0c0ff; padding: 10px 15px; margin-top: 25px; margin-bottom: 10px; border-radius: 5px; font-size: 1.5em; font-weight: 600; }
-        .section-header:first-of-type { margin-top: 10px; }
-        .ticket-table { width: 100%; border-collapse: collapse; background-color: #252538; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 1em; margin-bottom: 20px; }
-        .ticket-table th, .ticket-table td { border: 1px solid #3a3a50; padding: 10px 12px; text-align: left; vertical-align: top; }
-        .ticket-table th { background-color: #30304a; color: #c0c0ff; font-weight: 600; font-size: 1.05em; }
-        .ticket-table tr:nth-child(even) { background-color: #28283c; }
-        .ticket-table tr:hover { background-color: #353550; }
-        .ticket-id a { font-weight: 600; color: #82aaff; text-decoration: none; }
-        .ticket-id a:hover { text-decoration: underline; }
-        .ticket-subject { font-weight: 500; max-width: 350px; word-break: break-word; }
-        .description-tooltip { position: relative; cursor: help; }
-        .description-tooltip .tooltiptext { visibility: hidden; width: 300px; background-color: #111; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -150px; opacity: 0; transition: opacity 0.3s; font-size: 0.9em; line-height: 1.4; }
-        .description-tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
-        .sla-normal { color: #66bb6a; } .sla-warning { color: #ffa726; font-weight: 600;} .sla-critical { color: #ef5350; font-weight: 600;} .sla-overdue { color: #f44336; font-weight: 700; animation: blink-animation 1.2s steps(5, start) infinite; } .sla-none { color: #bdbdbd; } .sla-responded { color: #90a4ae; font-style: italic; } .sla-in-progress { color: #78909c; font-style: italic; }
-        @keyframes blink-animation { to { visibility: hidden; } }
-        .priority-Low { color: #81c784; } .priority-Medium { color: #ffee58; } .priority-High { color: #ff7043; font-weight: 600; } .priority-Urgent { color: #d32f2f; font-weight: 700; animation: blink-animation 1.2s steps(5, start) infinite alternate; }
-        .col-id { width: 5%; } .col-subject { width: 25%; } .col-requester {width: 9%;} .col-agent { width: 9%; } .col-status { width: 10%; } .col-priority { width: 8%; } .col-action-sla { width: 18%; } .col-updated { width: 8%; } .col-created { width: 8%; }
-        .no-tickets-message { text-align: center; font-size: 1.2em; padding: 20px; color: #aaa; }
-        @media (min-width: 1900px) { body { font-size: 16px; padding: 20px; } h1 { font-size: 2.8em; margin-bottom: 20px; } .info-bar { padding: 12px 18px; font-size: 1.2em; margin-bottom: 20px;} .ticket-table th, .ticket-table td { padding: 12px 15px; } .ticket-table th {font-size: 1.1em;} .ticket-subject { max-width: 450px; } .section-header { font-size: 1.8em; } }
+        :root {
+            --arcade-bg: #1a1a2e;
+            --arcade-blue: #00a8cc;
+            --arcade-pink: #f08ab6;
+            --arcade-green: #a8e6cf;
+            --arcade-yellow: #ffd3b6;
+            --arcade-text: #e0e0ff;
+            --font-main: 'Press Start 2P', cursive;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--arcade-bg);
+            color: var(--arcade-text);
+            text-shadow: 2px 2px 2px #000;
+            margin: 0;
+            padding: 20px;
+            /* Hide the default system cursor */
+            cursor: none;
+        }
+
+        /* Style for our new custom cursor element */
+        #custom-cursor {
+            position: absolute;
+            width: 24px;  /* Match your image size */
+            height: 24px; /* Match your image size */
+            pointer-events: none; /* Allows clicks to pass through */
+            z-index: 10001; /* Ensure it's on top of everything */
+        }
+
+        .container {
+            max-width: 95%;
+            margin: 0 auto;
+            border: 4px solid var(--arcade-blue);
+            padding: 20px;
+            box-shadow: 0 0 20px var(--arcade-blue);
+            background: rgba(26, 26, 46, 0.8);
+        }
+
+        h1 {
+            color: var(--arcade-yellow);
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px var(--arcade-yellow); }
+            to { text-shadow: 0 0 20px #fff, 0 0 30px #fff, 0 0 40px var(--arcade-yellow); }
+        }
+
+        .section-header {
+            color: var(--arcade-pink);
+            font-size: 1.8em;
+            margin: 40px 0 15px 0;
+            text-align: center;
+        }
+
+        .ticket-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .ticket-card {
+            background: #2a2a40;
+            border: 2px solid var(--arcade-green);
+            padding: 15px;
+            border-radius: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .ticket-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 15px var(--arcade-green);
+        }
+
+        .ticket-card h3 {
+            font-size: 1.2em;
+            color: var(--arcade-yellow);
+            margin: 0 0 10px 0;
+        }
+
+        .ticket-card p {
+            font-size: 0.9em;
+            margin: 5px 0;
+        }
+
+        .ticket-card .label {
+            color: var(--arcade-blue);
+        }
+
+        .priority-Urgent, .priority-High {
+             animation: critical-glow 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes critical-glow {
+            from { box-shadow: 0 0 15px var(--arcade-pink); }
+            to { box-shadow: 0 0 25px var(--arcade-pink); }
+        }
+
+        .no-tickets {
+            text-align: center;
+            font-size: 1.5em;
+            color: var(--arcade-green);
+            padding: 50px;
+        }
+
+        .cursor-trail {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: var(--arcade-pink);
+            border-radius: 0;
+            pointer-events: none;
+            z-index: 9999;
+            animation: fadeOut 0.5s forwards;
+            box-shadow: 0 0 5px var(--arcade-pink);
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: scale(0);
+            }
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .mimic-container {
+            position: relative;
+            width: 600px;
+            height: 400px;
+        }
+
+        .mimic-image {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            transition: opacity 0.3s;
+        }
+
+        .mimic-closed {
+            background-image: url("{{ url_for('static', filename='images/mimic-closed.png') }}");
+            opacity: 1;
+        }
+
+        .mimic-open {
+            background-image: url("{{ url_for('static', filename='images/mimic-open.png') }}");
+            opacity: 0;
+        }
+
+        .mimic-container.open .mimic-closed {
+            opacity: 0;
+        }
+
+        .mimic-container.open .mimic-open {
+            opacity: 1;
+        }
+
+        .ticket-details {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            padding: 20px;
+            color: var(--arcade-text);
+            opacity: 0;
+            transition: opacity 0.5s 0.3s;
+        }
+
+        .mimic-container.open .ticket-details {
+            opacity: 1;
+        }
+
     </style>
 </head>
 <body>
+    <img src="{{ url_for('static', filename='images/8-bit-cursor.png') }}" id="custom-cursor" alt="custom cursor">
+
+    <audio id="background-music" src="{{ url_for('static', filename='audio/background-music.mp3') }}" loop></audio>
+    <audio id="hover-sound" src="{{ url_for('static', filename='audio/hover-blip.wav') }}"></audio>
+    <audio id="click-sound" src="{{ url_for('static', filename='audio/click-coin.wav') }}"></audio>
+
     <div class="container">
-        <h1>Integotec - Ticket Dashboard</h1>
-        <div class="info-bar">
-            <span>Total Active Tickets: <strong>{{ s1_open_tickets|length + s2_waiting_agent_tickets|length + s3_remaining_tickets|length }}</strong></span>
-            <span>Dashboard Generated: <em>{{ dashboard_generated_time }}</em></span>
+        <h1>Integotec Ticket Arcade</h1>
+
+        <div class="section-header">Active Missions ({{ s1_items|length + s2_items|length + s3_items|length }})</div>
+        <div class="ticket-grid">
+            {% for item in s1_items + s2_items + s3_items %}
+                <div class="ticket-card priority-{{item.priority_text}}" data-ticket-id="{{ item.id }}">
+                    <h3>Quest: {{ item.subject | truncate(30) }}</h3>
+                    <p><span class="label">NPC:</span> {{ item.requester_name }}</p>
+                    <p><span class="label">Player:</span> {{ item.agent_name }}</p>
+                    <p><span class="label">Status:</span> {{ item.status_text }}</p>
+                    <p><span class="label">Urgency:</span> {{ item.priority_text }}</p>
+                </div>
+            {% endfor %}
+            {% if not (s1_items or s2_items or s3_items) %}
+                <p class="no-tickets">All quiet... No active missions!</p>
+            {% endif %}
         </div>
 
-        {# --- Section 1: Open Tickets (Status ID 2) --- #}
-        <div class="section-header">Open Tickets ({{ s1_open_tickets|length }})</div>
-        {% if s1_open_tickets %}
-            <table class="ticket-table">
-                <thead>
-                    <tr>
-                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
-                        <th class="col-status">Status</th> <th class="col-priority">Priority</th> <th class="col-action-sla">Action / SLA</th>
-                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for ticket in s1_open_tickets %}
-                    <tr>
-                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
-                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ ticket.requester_id if ticket.requester_id else 'N/A' }}</td>
-                        <td>{{ ticket.responder_id if ticket.responder_id else 'Unassigned' }}</td>
-                        <td>{{ ticket.status_text }}</td> <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
-                        <td class="col-action-sla">
-                            <span class="{{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
-                            {% if ticket.first_responded_at_dt is none and ticket.fr_due_by_dt %}
-                                <br><small>FR Due: ({{ ticket.fr_due_by_dt.strftime('%b %d, %H:%M') }})</small>
-                            {% endif %}
-                        </td>
-                        <td>{{ ticket.updated_friendly }}{% if ticket.updated_at_dt %}<br><small>({{ ticket.updated_at_dt.strftime('%b %d, %H:%M') }})</small>{% endif %}</td>
-                        <td>{% if ticket.created_at_dt %}{{ ticket.created_at_dt.strftime('%b %d, %Y') }}{% else %}N/A{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p class="no-tickets-message">No tickets currently in 'Open' status.</p>
-        {% endif %}
+        <div class="section-header">Side Quests ({{ s4_items|length }})</div>
+        <div class="ticket-grid">
+            {% for item in s4_items %}
+                <div class="ticket-card" data-ticket-id="{{ item.id }}">
+                    <h3>Side Quest: {{ item.subject | truncate(30) }}</h3>
+                    <p><span class="label">NPC:</span> {{ item.requester_name }}</p>
+                    <p><span class="label">Player:</span> {{ item.agent_name }}</p>
+                    <p><span class="label">Status:</span> {{ item.status_text }}</p>
+                </div>
+            {% endfor %}
+            {% if not s4_items %}
+                <p class="no-tickets">No side quests available!</p>
+            {% endif %}
+        </div>
+    </div>
 
-        {# --- Section 2: Waiting on Agent (Sorted by last update, oldest first) --- #}
-        <div class="section-header">Waiting on Agent ({{ s2_waiting_agent_tickets|length }})</div>
-        {% if s2_waiting_agent_tickets %}
-            <table class="ticket-table">
-                <thead>
-                    <tr>
-                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
-                        <th class="col-status">Status</th> <th class="col-priority">Priority</th> <th class="col-action-sla">Action / Status</th>
-                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for ticket in s2_waiting_agent_tickets %}
-                    <tr>
-                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
-                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ ticket.requester_id if ticket.requester_id else 'N/A' }}</td>
-                        <td>{{ ticket.responder_id if ticket.responder_id else 'Unassigned' }}</td>
-                        <td>{{ ticket.status_text }}</td> <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
-                        <td class="col-action-sla">
-                            <span class="{{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
-                             <br><small>Agent replied: {{ ticket.agent_responded_friendly }}</small>
-                        </td>
-                        <td>{{ ticket.updated_friendly }}{% if ticket.updated_at_dt %}<br><small>({{ ticket.updated_at_dt.strftime('%b %d, %H:%M') }})</small>{% endif %}</td>
-                        <td>{% if ticket.created_at_dt %}{{ ticket.created_at_dt.strftime('%b %d, %Y') }}{% else %}N/A{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p class="no-tickets-message">No tickets currently in 'Waiting on Agent' status.</p>
-        {% endif %}
-
-        {# --- Section 3: Remaining Active Tickets --- #}
-        <div class="section-header">Remaining Active Tickets ({{ s3_remaining_tickets|length }})</div>
-        {% if s3_remaining_tickets %}
-            <table class="ticket-table">
-                <thead>
-                    <tr>
-                        <th class="col-id">ID</th> <th class="col-subject">Subject</th> <th class="col-requester">Requester</th> <th class="col-agent">Agent</th>
-                        <th class="col-status">Status</th> <th class="col-priority">Priority</th> <th class="col-action-sla">Current Stage / Agent Action</th>
-                        <th class="col-updated">Last Update</th> <th class="col-created">Created</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for ticket in s3_remaining_tickets %}
-                    <tr>
-                        <td class="ticket-id"><a href="{{ freshservice_base_url }}{{ ticket.id }}" target="_blank">{{ ticket.id }}</a></td>
-                        <td class="ticket-subject description-tooltip">{{ ticket.subject | truncate(60, True) }}{% if ticket.description_text %}<span class="tooltiptext">{{ ticket.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ ticket.requester_id if ticket.requester_id else 'N/A' }}</td>
-                        <td>{{ ticket.responder_id if ticket.responder_id else 'Unassigned' }}</td>
-                        <td>{{ ticket.status_text }}</td>
-                        <td><span class="priority-{{ ticket.priority_text }}">{{ ticket.priority_text }}</span></td>
-                        <td class="col-action-sla">
-                            <span class="{{ ticket.sla_class }}">{{ ticket.sla_text }}</span>
-                            {% if ticket.sla_class == 'sla-critical' and 'Review Needed' in ticket.sla_text %}
-                               <br><small>Agent replied: {{ ticket.agent_responded_friendly }}</small>
-                            {% elif ticket.status_raw == WAITING_ON_CUSTOMER_STATUS_ID %}
-                                {% endif %}
-                        </td>
-                        <td>{{ ticket.updated_friendly }}{% if ticket.updated_at_dt %}<br><small>({{ ticket.updated_at_dt.strftime('%b %d, %H:%M') }})</small>{% endif %}</td>
-                        <td>{% if ticket.created_at_dt %}{{ ticket.created_at_dt.strftime('%b %d, %Y') }}{% else %}N/A{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p class="no-tickets-message">No other active tickets found.</p>
-        {% endif %}
-
+    <div class="modal-overlay" id="mimic-modal">
+        <div class="mimic-container" id="mimic-container">
+            <div class="mimic-image mimic-closed"></div>
+            <div class="mimic-image mimic-open"></div>
+            <div class="ticket-details" id="modal-ticket-details">
+                </div>
+        </div>
     </div>
 
     <script>
-        const refreshInterval = {{ auto_refresh_ms }};
-        if (refreshInterval > 0) {
-            setTimeout(function(){ window.location.reload(true); }, refreshInterval);
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const backgroundMusic = document.getElementById('background-music');
+            const hoverSound = document.getElementById('hover-sound');
+            const clickSound = document.getElementById('click-sound');
+            const ticketCards = document.querySelectorAll('.ticket-card');
+            const trailColors = ['#f08ab6', '#00a8cc', '#a8e6cf', '#ffd3b6'];
+            const mimicModal = document.getElementById('mimic-modal');
+            const mimicContainer = document.getElementById('mimic-container');
+            const modalTicketDetails = document.getElementById('modal-ticket-details');
+            const allTickets = {{ (s1_items + s2_items + s3_items + s4_items)|tojson }};
+            const customCursor = document.getElementById('custom-cursor'); // Get the cursor element
+
+            document.body.addEventListener('click', () => {
+                if (backgroundMusic.paused) {
+                    backgroundMusic.volume = 0.3;
+                    backgroundMusic.play();
+                }
+            }, { once: true });
+
+            ticketCards.forEach(card => {
+                card.addEventListener('mouseenter', () => {
+                    hoverSound.currentTime = 0;
+                    hoverSound.play();
+                });
+
+                card.addEventListener('click', () => {
+                    clickSound.currentTime = 0;
+                    clickSound.play();
+
+                    const ticketId = parseInt(card.dataset.ticketId, 10);
+                    const ticketData = allTickets.find(t => t.id === ticketId);
+
+                    if (ticketData) {
+                        let goldValue = 50;
+                        if (ticketData.priority_text === 'High') goldValue += 50;
+                        if (ticketData.priority_text === 'Urgent') goldValue += 100;
+
+                        modalTicketDetails.innerHTML = `
+                            <h3>${ticketData.subject}</h3>
+                            <p>${ticketData.description_text || 'No description available.'}</p>
+                            <p><span class="label">Gold Value:</span> ${goldValue} GP</p>
+                        `;
+
+                        mimicModal.style.display = 'flex';
+                        setTimeout(() => {
+                            mimicContainer.classList.add('open');
+                        }, 100);
+                    }
+                });
+            });
+
+            mimicModal.addEventListener('click', (e) => {
+                if (e.target === mimicModal) {
+                    mimicContainer.classList.remove('open');
+                    setTimeout(() => {
+                        mimicModal.style.display = 'none';
+                    }, 500);
+                }
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                // Update custom cursor position
+                customCursor.style.left = `${e.pageX}px`;
+                customCursor.style.top = `${e.pageY}px`;
+
+                // Generate trail effect
+                const trail = document.createElement('div');
+                trail.className = 'cursor-trail';
+
+                trail.style.left = `${e.pageX - 4}px`;
+                trail.style.top = `${e.pageY - 4}px`;
+
+                trail.style.backgroundColor = trailColors[Math.floor(Math.random() * trailColors.length)];
+
+                document.body.appendChild(trail);
+
+                setTimeout(() => {
+                    trail.remove();
+                }, 500);
+            });
+        });
     </script>
 </body>
 </html>

@@ -338,6 +338,36 @@ def load_and_process_tickets(current_view_slug, agent_id=None):
 def dashboard_default():
     return redirect(url_for('dashboard_typed', view_slug=DEFAULT_VIEW_SLUG))
 
+@app.route('/fun')
+def dashboard_fun():
+    # This function will specifically render index_fun.html
+    # You'll need to pass all the same data as the main dashboard route
+    view_slug = 'helpdesk' # or some default
+    agent_id = request.args.get('agent_id', type=int)
+    s1_items, s2_items, s3_items, s4_items = load_and_process_tickets(view_slug, agent_id=agent_id)
+    generated_time_utc = datetime.datetime.now(datetime.timezone.utc)
+    dashboard_generated_time_iso = generated_time_utc.isoformat()
+
+    return render_template("index_fun.html", # <-- Explicitly name the template
+                            s1_items=s1_items,
+                            s2_items=s2_items,
+                            s3_items=s3_items,
+                            s4_items=s4_items,
+                            dashboard_generated_time_iso=dashboard_generated_time_iso,
+                            auto_refresh_ms=AUTO_REFRESH_INTERVAL_SECONDS * 1000,
+                            freshservice_base_url=f"https://{FRESHSERVICE_DOMAIN}/a/tickets/",
+                            page_title_display="Fun View",
+                            section1_name="Section 1",
+                            section2_name="Section 2",
+                            section3_name="Section 3",
+                            section4_name="Section 4",
+                            agent_mapping=AGENT_MAPPING,
+                            selected_agent_id=agent_id,
+                            supported_views=SUPPORTED_VIEWS,
+                            current_view_slug=view_slug,
+                            current_view_display=SUPPORTED_VIEWS.get(view_slug, "Fun")
+                           )
+
 @app.route('/<view_slug>')
 def dashboard_typed(view_slug):
     if view_slug not in SUPPORTED_VIEWS:
