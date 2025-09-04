@@ -6,6 +6,7 @@ import ssl
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 import ticket_watcher # Import the ticket_watcher script
+import atexit
 
 # --- Configuration ---
 TICKETS_DIR = "./tickets"
@@ -70,8 +71,11 @@ SLA_UPDATE_THRESHOLDS = {
 
 # --- Scheduler Setup ---
 scheduler = BackgroundScheduler()
-scheduler.start(paused=True)  # Start paused, will be started from settings
+scheduler.start() # Start in a running state by default
 POLL_INTERVAL = 180 # Default to 3 minutes (180 seconds)
+
+# Register a function to shut down the scheduler when the app exits
+atexit.register(lambda: scheduler.shutdown())
 
 @scheduler.scheduled_job('interval', seconds=POLL_INTERVAL, id='ticket_watcher_job')
 def run_ticket_watcher():
@@ -286,11 +290,11 @@ def load_and_process_tickets(current_view_slug, agent_id=None):
                 ticket_data_item['_sort_needs_fr'] = 0 if needs_fr else 1
                 fr_sla_metric = float('inf')
                 if needs_fr and ticket_data_item['type'] == 'Incident':
-                     _, _, fr_hours_remaining = get_fr_sla_details(
-                        ticket_data_item['type'], ticket_data_item['sla_target_due_dt_obj'],
-                        FR_SLA_CRITICAL_HOURS, FR_SLA_WARNING_HOURS
-                    )
-                     fr_sla_metric = fr_hours_remaining
+                        _, _, fr_hours_remaining = get_fr_sla_details(
+                            ticket_data_item['type'], ticket_data_item['sla_target_due_dt_obj'],
+                            FR_SLA_CRITICAL_HOURS, FR_SLA_WARNING_HOURS
+                        )
+                        fr_sla_metric = fr_hours_remaining
                 ticket_data_item['_sort_fr_sla_metric'] = fr_sla_metric
 
                 # --- NEW Categorization Logic ---
@@ -365,11 +369,17 @@ def settings():
     if request.method == 'POST':
         action = request.form.get('action')
         if action == 'start':
-            scheduler.resume()
-            flash('Ticket watcher started.', 'success')
+            if scheduler.state == 2: # STATE_PAUSED
+                scheduler.resume()
+                flash('Ticket watcher started.', 'success')
+            else:
+                flash('Ticket watcher is already running.', 'info')
         elif action == 'stop':
-            scheduler.pause()
-            flash('Ticket watcher stopped.', 'success')
+            if scheduler.state == 1: # STATE_RUNNING
+                scheduler.pause()
+                flash('Ticket watcher stopped.', 'success')
+            else:
+                flash('Ticket watcher is already stopped.', 'info')
         elif action == 'update_interval':
             try:
                 new_interval = int(request.form.get('interval', POLL_INTERVAL))
@@ -382,7 +392,10 @@ def settings():
             except (ValueError, TypeError):
                 flash('Invalid interval value.', 'error')
 
-    status = "Running" if scheduler.running and scheduler.get_job('ticket_watcher_job').next_run_time else "Stopped"
+        return redirect(url_for('settings'))
+
+    # Use scheduler.state which is more accurate: 1=running, 2=paused
+    status = "Running" if scheduler.state == 1 else "Stopped"
 
     return render_template('settings.html',
                            scheduler_status=status,
@@ -405,24 +418,24 @@ def dashboard_fun():
     dashboard_generated_time_iso = generated_time_utc.isoformat()
 
     return render_template("index_fun.html", # <-- Explicitly name the template
-                            s1_items=s1_items,
-                            s2_items=s2_items,
-                            s3_items=s3_items,
-                            s4_items=s4_items,
-                            dashboard_generated_time_iso=dashboard_generated_time_iso,
-                            auto_refresh_ms=AUTO_REFRESH_INTERVAL_SECONDS * 1000,
-                            freshservice_base_url=f"https://{FRESHSERVICE_DOMAIN}/a/tickets/",
-                            page_title_display="Fun View",
-                            section1_name="Section 1",
-                            section2_name="Section 2",
-                            section3_name="Section 3",
-                            section4_name="Section 4",
-                            agent_mapping=AGENT_MAPPING,
-                            selected_agent_id=agent_id,
-                            supported_views=SUPPORTED_VIEWS,
-                            current_view_slug=view_slug,
-                            current_view_display=SUPPORTED_VIEWS.get(view_slug, "Fun")
-                           )
+                             s1_items=s1_items,
+                             s2_items=s2_items,
+                             s3_items=s3_items,
+                             s4_items=s4_items,
+                             dashboard_generated_time_iso=dashboard_generated_time_iso,
+                             auto_refresh_ms=AUTO_REFRESH_INTERVAL_SECONDS * 1000,
+                             freshservice_base_url=f"https://{FRESHSERVICE_DOMAIN}/a/tickets/",
+                             page_title_display="Fun View",
+                             section1_name="Section 1",
+                             section2_name="Section 2",
+                             section3_name="Section 3",
+                             section4_name="Section 4",
+                             agent_mapping=AGENT_MAPPING,
+                             selected_agent_id=agent_id,
+                             supported_views=SUPPORTED_VIEWS,
+                             current_view_slug=view_slug,
+                             current_view_display=SUPPORTED_VIEWS.get(view_slug, "Fun")
+                            )
 
 @app.route('/<view_slug>')
 def dashboard_typed(view_slug):
@@ -444,28 +457,28 @@ def dashboard_typed(view_slug):
     section4_name = f"Other Active {current_view_display} Tickets"
 
     return render_template(INDEX_TEMPLATE,
-                            s1_items=s1_items,
-                            s2_items=s2_items,
-                            s3_items=s3_items,
-                            s4_items=s4_items,
-                            dashboard_generated_time_iso=dashboard_generated_time_iso,
-                            auto_refresh_ms=AUTO_REFRESH_INTERVAL_SECONDS * 1000,
-                            freshservice_base_url=f"https://{FRESHSERVICE_DOMAIN}/a/tickets/",
-                            current_view_slug=view_slug,
-                            current_view_display=current_view_display,
-                            supported_views=SUPPORTED_VIEWS,
-                            page_title_display=current_view_display,
-                            section1_name=section1_name,
-                            section2_name=section2_name,
-                            section3_name=section3_name,
-                            section4_name=section4_name,
-                            OPEN_STATUS_ID=OPEN_STATUS_ID,
-                            PENDING_STATUS_ID=PENDING_STATUS_ID,
-                            WAITING_ON_CUSTOMER_STATUS_ID=WAITING_ON_CUSTOMER_STATUS_ID,
-                            WAITING_ON_AGENT_STATUS_ID=WAITING_ON_AGENT_STATUS_ID,
-                            agent_mapping=AGENT_MAPPING,
-                            selected_agent_id=agent_id
-                           )
+                             s1_items=s1_items,
+                             s2_items=s2_items,
+                             s3_items=s3_items,
+                             s4_items=s4_items,
+                             dashboard_generated_time_iso=dashboard_generated_time_iso,
+                             auto_refresh_ms=AUTO_REFRESH_INTERVAL_SECONDS * 1000,
+                             freshservice_base_url=f"https://{FRESHSERVICE_DOMAIN}/a/tickets/",
+                             current_view_slug=view_slug,
+                             current_view_display=current_view_display,
+                             supported_views=SUPPORTED_VIEWS,
+                             page_title_display=current_view_display,
+                             section1_name=section1_name,
+                             section2_name=section2_name,
+                             section3_name=section3_name,
+                             section4_name=section4_name,
+                             OPEN_STATUS_ID=OPEN_STATUS_ID,
+                             PENDING_STATUS_ID=PENDING_STATUS_ID,
+                             WAITING_ON_CUSTOMER_STATUS_ID=WAITING_ON_CUSTOMER_STATUS_ID,
+                             WAITING_ON_AGENT_STATUS_ID=WAITING_ON_AGENT_STATUS_ID,
+                             agent_mapping=AGENT_MAPPING,
+                             selected_agent_id=agent_id
+                            )
 
 # --- API Endpoint ---
 @app.route('/api/tickets/<view_slug>')
@@ -515,15 +528,14 @@ if __name__ == '__main__':
             except OSError as e:
                 app.logger.error(f"Failed to create directory {abs_dir_path}: {e}")
                 if dir_path in [templates_dir, STATIC_DIR]:
-                     exit(f"Error: Could not create essential directory {abs_dir_path}. Exiting.")
+                        exit(f"Error: Could not create essential directory {abs_dir_path}. Exiting.")
 
     AGENT_MAPPING = load_mapping_file(AGENTS_FILE, "agent")
     if not AGENT_MAPPING: app.logger.warning(f"Agent mapping from '{AGENTS_FILE}' is empty or failed to load.")
     REQUESTER_MAPPING = load_mapping_file(REQUESTERS_FILE, "requester")
     if not REQUESTER_MAPPING: app.logger.warning(f"Requester mapping from '{REQUESTERS_FILE}' is empty or failed to load.")
 
-    # Start the scheduler
-    scheduler.resume()
+    # Log the fact that the scheduler has started
     app.logger.info(f"Ticket watcher scheduler started with a {POLL_INTERVAL} second interval.")
 
 
