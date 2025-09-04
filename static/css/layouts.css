@@ -91,8 +91,7 @@ body.sidebar-collapsed .sidebar-header {
     justify-content: center;
 }
 
-body.sidebar-collapsed .sidebar-nav a,
-body.sidebar-collapsed .sidebar-footer .theme-toggle-btn {
+body.sidebar-collapsed .sidebar-nav a {
     justify-content: center;
     padding: 12px 0;
 }
@@ -100,6 +99,14 @@ body.sidebar-collapsed .sidebar-footer .theme-toggle-btn {
 body.sidebar-collapsed .sidebar-nav a i {
     margin-right: 0;
 }
+
+body.sidebar-collapsed .sidebar-footer {
+    padding: 15px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 
 /* --- Main Content Area --- */
 .main-content {

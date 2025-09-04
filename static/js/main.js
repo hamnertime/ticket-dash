@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
     const body = document.body;
-    const themeToggle = document.getElementById('theme-toggle');
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const agentFilter = document.getElementById('agent-filter');
 
@@ -22,29 +21,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Theme Logic ---
-    function applyTheme(theme) {
-        if (theme === 'dark') {
-            body.classList.remove('light-mode');
-            body.classList.add('dark-mode');
-            if (themeToggle) {
-                themeToggle.innerHTML = '<i class="fas fa-sun"></i> <span>Light Mode</span>';
-            }
-        } else { // Default to light
-            body.classList.remove('dark-mode');
-            body.classList.add('light-mode');
-            if (themeToggle) {
-                themeToggle.innerHTML = '<i class="fas fa-moon"></i> <span>Dark Mode</span>';
-            }
+    const toggleSwitch = document.querySelector('.theme-switch input[type="checkbox"]');
+    const currentTheme = localStorage.getItem('theme');
+
+    if (currentTheme) {
+        body.classList.add(currentTheme);
+        if (currentTheme === 'dark-mode') {
+            toggleSwitch.checked = true;
+        }
+    } else {
+        // Default to light mode if no theme is set
+        body.classList.add('light-mode');
+        localStorage.setItem('theme', 'light-mode');
+        if(toggleSwitch) {
+            toggleSwitch.checked = false;
         }
     }
 
-    if (themeToggle) {
-        themeToggle.addEventListener('click', () => {
-            let newTheme = body.classList.contains('light-mode') ? 'dark' : 'light';
-            localStorage.setItem('theme', newTheme);
-            applyTheme(newTheme);
-        });
+    function switchTheme(e) {
+        if (e.target.checked) {
+            body.classList.remove('light-mode');
+            body.classList.add('dark-mode');
+            localStorage.setItem('theme', 'dark-mode');
+        }
+        else {
+            body.classList.remove('dark-mode');
+            body.classList.add('light-mode');
+            localStorage.setItem('theme', 'light-mode');
+        }
     }
+
+    if (toggleSwitch) {
+        toggleSwitch.addEventListener('change', switchTheme, false);
+    }
+
 
     // --- Agent Filter Logic ---
     if (agentFilter) {
@@ -61,8 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Initial State Application ---
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    applyTheme(savedTheme);
     applySidebarState();
 
 
