@@ -27,6 +27,7 @@ WAITING_ON_CUSTOMER_STATUS_ID = 9
 WAITING_ON_AGENT_STATUS_ID = 26 # This is now "Customer Replied"
 ON_HOLD_STATUS_ID = 23
 UPDATE_NEEDED_STATUS_ID = 19
+PENDING_HUBSPOT_STATUS_ID = 27 # Added for Pending Hubspot status
 
 # --- NEW: View Configuration ---
 SUPPORTED_VIEWS = {
@@ -144,7 +145,8 @@ def get_status_text(status_id, ticket_type=""):
         13: "Under Investigation",
         UPDATE_NEEDED_STATUS_ID: "Update Needed",
         ON_HOLD_STATUS_ID: "On Hold",
-        WAITING_ON_AGENT_STATUS_ID: "Customer Replied", # UPDATED
+        WAITING_ON_AGENT_STATUS_ID: "Customer Replied",
+        PENDING_HUBSPOT_STATUS_ID: "Pending Hubspot",
     }
     default_text = f"Unknown Status ({status_id})"
     return status_map.get(status_id, default_text)
@@ -277,10 +279,14 @@ def load_and_process_tickets(current_view_slug, agent_id=None):
                     ticket_data_item['sla_text'] = f"Customer Replied ({ticket_data_item['updated_friendly']})"
                     ticket_data_item['sla_class'] = "sla-warning"
                     list_section2_items.append(ticket_data_item)
+                elif ticket_data_item['status_raw'] == PENDING_HUBSPOT_STATUS_ID:
+                    ticket_data_item['sla_text'] = f"Pending Hubspot ({ticket_data_item['updated_friendly']})"
+                    ticket_data_item['sla_class'] = "sla-none"
+                    list_section4_items.append(ticket_data_item)
                 elif is_update_sla_breached:
                     ticket_data_item['sla_text'] = f"Update Overdue ({original_status_text}, {ticket_data_item['updated_friendly']})"
                     ticket_data_item['sla_class'] = "sla-critical"
-                    list_section3_items.append(ticket_data_item) # FIX: Was list_section3_item
+                    list_section3_items.append(ticket_data_item)
                 else:
                     section1_trigger_statuses = [OPEN_STATUS_ID, UPDATE_NEEDED_STATUS_ID, PENDING_STATUS_ID]
                     if ticket_data_item['status_raw'] in section1_trigger_statuses:
@@ -303,6 +309,7 @@ def load_and_process_tickets(current_view_slug, agent_id=None):
                         elif ticket_data_item['status_raw'] == ON_HOLD_STATUS_ID:
                             ticket_data_item['sla_text'] = f"On Hold ({ticket_data_item['updated_friendly']})"
                             ticket_data_item['sla_class'] = "sla-none"
+                        # Any other status will fall through to here
                         list_section4_items.append(ticket_data_item)
 
             except json.JSONDecodeError:
