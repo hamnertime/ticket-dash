@@ -7,7 +7,14 @@
     color: var(--text-secondary);
     font-size: 1.2rem;
     cursor: pointer;
-    padding: 5px;
+    padding: 8px; /* Adjusted padding */
+    border-radius: var(--border-radius); /* Added border-radius */
+    transition: background-color var(--transition-speed), color var(--transition-speed);
+}
+
+.sidebar-toggle-btn:hover {
+    background-color: var(--accent-hover); /* Gold background on hover */
+    color: var(--text-light); /* White icon on hover */
 }
 
 .theme-toggle-btn {
@@ -18,7 +25,6 @@
     gap: 15px;
     font-size: 1rem;
     padding: 10px;
-    border-radius: var(--border-radius);
     transition: background-color var(--transition-speed), color var(--transition-speed);
 }
 
@@ -95,6 +101,10 @@
     font-weight: 500;
     color: var(--text-secondary);
     border-bottom-width: 2px;
+}
+
+.item-table tbody tr:nth-child(even) {
+    background-color: var(--bg-quaternary);
 }
 
 .item-table tbody tr:hover {

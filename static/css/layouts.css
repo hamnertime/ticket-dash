@@ -43,7 +43,7 @@
     display: flex;
     align-items: center;
     padding: 12px 20px;
-    color: var(--text-light); /* Default text/icon color to white */
+    color: var(--text-primary); /* Use primary text color */
     white-space: nowrap;
     transition: background-color var(--transition-speed), color var(--transition-speed);
 }
@@ -138,6 +138,12 @@ body.sidebar-collapsed .main-content {
     margin: 0;
 }
 
+.header-center {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+}
+
 .header-right {
     display: flex;
     align-items: center;
@@ -146,6 +152,10 @@ body.sidebar-collapsed .main-content {
 
 .info-metric {
     text-align: right;
+}
+
+.info-metric.centered {
+    text-align: center;
 }
 
 .info-metric span {

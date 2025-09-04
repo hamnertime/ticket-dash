@@ -17,6 +17,7 @@
     --bg-primary: #ffffff;
     --bg-secondary: #f8f9fa;
     --bg-tertiary: #e9ecef;
+    --bg-quaternary: #f1f3f5; /* Added for alternating rows */
     --text-primary: #212529;
     --text-secondary: #6c757d;
     --text-light: #ffffff;
@@ -34,6 +35,7 @@ body.dark-mode {
     --bg-primary: #2c2c2c;      /* Sidebar, Header background */
     --bg-secondary: #1a1a1a;    /* Main content background */
     --bg-tertiary: #3c424a;     /* Hover color */
+    --bg-quaternary: #252525; /* Added for alternating rows */
     --text-primary: #f8f9fa;
     --text-secondary: #adb5bd;
     --border-color: #444444;
