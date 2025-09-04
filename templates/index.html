@@ -1,190 +1,115 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integotec - {{ page_title_display }} Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script>
-        window.FRESHSERVICE_BASE_URL = "{{ freshservice_base_url }}";
-        window.AUTO_REFRESH_MS = {{ auto_refresh_ms }};
-        window.CURRENT_TICKET_TYPE_SLUG = "{{ current_view_slug }}";
-        window.CURRENT_TICKET_TYPE_DISPLAY = "{{ current_view_display }}";
-    </script>
-</head>
-<body>
-    <div class="container">
-        <h1>Integotec - {{ page_title_display }} Dashboard</h1>
+{% extends "layout.html" %}
 
-        <div class="info-bar">
-            <div class="ticket-type-switcher">
-                <span>View:</span>
-                {% for slug, display_name in supported_views.items() %}
-                    <a href="{{ url_for('dashboard_typed', view_slug=slug) }}"
-                       class="type-switch-button {% if slug == current_view_slug %}active{% endif %}">
-                        {{ display_name }}
-                    </a>
-                {% endfor %}
-            </div>
-            <span>Total Active Tickets: <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length + s4_items|length }}</strong></span>
-            <span>Dashboard Generated: <em id="dashboard-generated-time">Loading...</em></span>
-            <button id="theme-toggle">Toggle Theme</button>
-        </div>
+{% block title %}{{ page_title_display }} Dashboard{% endblock %}
 
-        <div class="filter-bar">
-            <label for="agent-filter">Filter by Agent:</label>
-            <select id="agent-filter">
-                <option value="">All</option>
-                {% for agent_id, agent_name in agent_mapping.items() %}
-                    <option value="{{ agent_id }}" {% if agent_id == selected_agent_id %}selected{% endif %}>{{ agent_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+{% block content %}
+<div class="filter-bar">
+    <label for="agent-filter">Filter by Agent:</label>
+    <select id="agent-filter">
+        <option value="">All Agents</option>
+        {% for agent_id, agent_name in agent_mapping.items() %}
+            <option value="{{ agent_id }}" {% if agent_id == selected_agent_id %}selected{% endif %}>{{ agent_name }}</option>
+        {% endfor %}
+    </select>
+</div>
 
-        {# --- Section 1: Open Tickets --- #}
-        <div class="section-container" id="s1-container">
-            <div class="section-header" id="s1-header">{{ section1_name }} (<span id="s1-item-count">{{ s1_items|length }}</span>)</div>
-            <table class="item-table" id="s1-item-table">
-                <thead>
-                    <tr>
-                        <th class="col-id sortable-header" data-sort-key="id">ID</th>
-                        <th class="col-subject sortable-header" data-sort-key="subject">Subject</th>
-                        <th class="col-requester sortable-header" data-sort-key="requester_name">Requester</th>
-                        <th class="col-agent sortable-header" data-sort-key="agent_name">Agent</th>
-                        <th class="col-priority sortable-header" data-sort-key="priority_raw">Priority</th>
-                        <th class="col-action-sla sortable-header" data-sort-key="sla_text">Action / SLA</th>
-                        <th class="col-updated sortable-header" data-sort-key="updated_at_str">Updated</th>
-                        <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
-                    </tr>
-                </thead>
-                <tbody id="s1-items-body">
-                    {% for item in s1_items %}
-                    <tr>
-                        <td class="item-id"><a href="{{ freshservice_base_url }}{{ item.id }}" target="_blank">{{ item.id }}</a></td>
-                        <td class="item-subject description-tooltip">{{ item.subject | truncate(60, True) }}{% if item.description_text %}<span class="tooltiptext">{{ item.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ item.requester_name }}</td>
-                        <td>{{ item.agent_name }}</td>
-                        <td><span class="priority-{{ item.priority_text }}">{{ item.priority_text }}</span></td>
-                        <td class="col-action-sla">
-                            <span class="sla-status-text {{ item.sla_class }}">{{ item.sla_text }}</span>
-                            {% if item.first_responded_at_iso is none and item.fr_due_by_str %}
-                                <div class="datetime-container" data-utc-datetime="{{ item.fr_due_by_str }}" data-prefix="FR Due: "><small class="local-datetime">Loading...</small></div>
-                            {% elif item.type == 'Service Request' and item.due_by_str %}
-                                <div class="datetime-container" data-utc-datetime="{{ item.due_by_str }}" data-prefix="Due: "><small class="local-datetime">Loading...</small></div>
-                            {% endif %}
-                        </td>
-                        <td>{{ item.updated_friendly }}</td>
-                        <td>{{ item.created_days_old }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <p id="s1-no-items-message" class="no-items-message" {% if not s1_items %}style="display: block;"{% else %}style="display: none;"{% endif %}>No tickets currently in this category.</p>
-        </div>
-
-        {# --- Section 2: Customer Replied (NEW) --- #}
-        <div class="section-container" id="s2-container">
-            <div class="section-header" id="s2-header">{{ section2_name }} (<span id="s2-item-count">{{ s2_items|length }}</span>)</div>
-            <table class="item-table" id="s2-item-table">
-                <thead>
-                    <tr>
-                        <th class="col-id sortable-header" data-sort-key="id">ID</th>
-                        <th class="col-subject sortable-header" data-sort-key="subject">Subject</th>
-                        <th class="col-requester sortable-header" data-sort-key="requester_name">Requester</th>
-                        <th class="col-agent sortable-header" data-sort-key="agent_name">Agent</th>
-                        <th class="col-priority sortable-header" data-sort-key="priority_raw">Priority</th>
-                        <th class="col-action-sla sortable-header" data-sort-key="sla_text">Action / Status</th>
-                        <th class="col-updated sortable-header" data-sort-key="updated_at_str">Updated</th>
-                        <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
-                    </tr>
-                </thead>
-                <tbody id="s2-items-body">
-                    {% for item in s2_items %}
-                    <tr>
-                        <td class="item-id"><a href="{{ freshservice_base_url }}{{ item.id }}" target="_blank">{{ item.id }}</a></td>
-                        <td class="item-subject description-tooltip">{{ item.subject | truncate(60, True) }}{% if item.description_text %}<span class="tooltiptext">{{ item.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ item.requester_name }}</td>
-                        <td>{{ item.agent_name }}</td>
-                        <td><span class="priority-{{ item.priority_text }}">{{ item.priority_text }}</span></td>
-                        <td class="col-action-sla"><span class="sla-status-text {{ item.sla_class }}">{{ item.sla_text }}</span></td>
-                        <td>{{ item.updated_friendly }}</td>
-                        <td>{{ item.created_days_old }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <p id="s2-no-items-message" class="no-items-message" {% if not s2_items %}style="display: block;"{% else %}style="display: none;"{% endif %}>No tickets currently have a customer reply.</p>
-        </div>
-
-        {# --- Section 3: Needs Agent / Update Overdue --- #}
-        <div class="section-container" id="s3-container">
-            <div class="section-header" id="s3-header">{{ section3_name }} (<span id="s3-item-count">{{ s3_items|length }}</span>)</div>
-            <table class="item-table" id="s3-item-table">
-                <thead>
-                    <tr>
-                        <th class="col-id sortable-header" data-sort-key="id">ID</th>
-                        <th class="col-subject sortable-header" data-sort-key="subject">Subject</th>
-                        <th class="col-requester sortable-header" data-sort-key="requester_name">Requester</th>
-                        <th class="col-agent sortable-header" data-sort-key="agent_name">Agent</th>
-                        <th class="col-priority sortable-header" data-sort-key="priority_raw">Priority</th>
-                        <th class="col-action-sla sortable-header" data-sort-key="sla_text">Action / Status</th>
-                        <th class="col-updated sortable-header" data-sort-key="updated_at_str">Updated</th>
-                        <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
-                    </tr>
-                </thead>
-                <tbody id="s3-items-body">
-                    {% for item in s3_items %}
-                    <tr>
-                        <td class="item-id"><a href="{{ freshservice_base_url }}{{ item.id }}" target="_blank">{{ item.id }}</a></td>
-                        <td class="item-subject description-tooltip">{{ item.subject | truncate(60, True) }}{% if item.description_text %}<span class="tooltiptext">{{ item.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ item.requester_name }}</td>
-                        <td>{{ item.agent_name }}</td>
-                        <td><span class="priority-{{ item.priority_text }}">{{ item.priority_text }}</span></td>
-                        <td class="col-action-sla"><span class="sla-status-text {{ item.sla_class }}">{{ item.sla_text }}</span></td>
-                        <td>{{ item.updated_friendly }}</td>
-                        <td>{{ item.created_days_old }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <p id="s3-no-items-message" class="no-items-message" {% if not s3_items %}style="display: block;"{% else %}style="display: none;"{% endif %}>No tickets currently need an agent or have an overdue update.</p>
-        </div>
-
-        {# --- Section 4: Other Active Tickets --- #}
-        <div class="section-container" id="s4-container">
-            <div class="section-header" id="s4-header">{{ section4_name }} (<span id="s4-item-count">{{ s4_items|length }}</span>)</div>
-            <table class="item-table" id="s4-item-table">
-                <thead>
-                    <tr>
-                        <th class="col-id sortable-header" data-sort-key="id">ID</th>
-                        <th class="col-subject sortable-header" data-sort-key="subject">Subject</th>
-                        <th class="col-requester sortable-header" data-sort-key="requester_name">Requester</th>
-                        <th class="col-agent sortable-header" data-sort-key="agent_name">Agent</th>
-                        <th class="col-priority sortable-header" data-sort-key="priority_raw">Priority</th>
-                        <th class="col-action-sla sortable-header" data-sort-key="status_text">Status</th>
-                        <th class="col-updated sortable-header" data-sort-key="updated_at_str">Updated</th>
-                        <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
-                    </tr>
-                </thead>
-                <tbody id="s4-items-body">
-                   {% for item in s4_items %}
-                    <tr>
-                        <td class="item-id"><a href="{{ freshservice_base_url }}{{ item.id }}" target="_blank">{{ item.id }}</a></td>
-                        <td class="item-subject description-tooltip">{{ item.subject | truncate(60, True) }}{% if item.description_text %}<span class="tooltiptext">{{ item.description_text | striptags | truncate(300, True) }}</span>{% endif %}</td>
-                        <td>{{ item.requester_name }}</td>
-                        <td>{{ item.agent_name }}</td>
-                        <td><span class="priority-{{ item.priority_text }}">{{ item.priority_text }}</span></td>
-                        <td class="col-action-sla"><span class="sla-status-text {{ item.sla_class }}">{{ item.sla_text }}</span></td>
-                        <td>{{ item.updated_friendly }}</td>
-                        <td>{{ item.created_days_old }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <p id="s4-no-items-message" class="no-items-message" {% if not s4_items %}style="display: block;"{% else %}style="display: none;"{% endif %}>No other active tickets found.</p>
-        </div>
+{# --- Section 1: Open Tickets --- #}
+<div class="widget-container" id="s1-container">
+    <div class="widget-header">
+        <h2>{{ section1_name }} (<span id="s1-item-count">{{ s1_items|length }}</span>)</h2>
     </div>
+    <div class="widget-content">
+        <table class="item-table" id="s1-item-table">
+            <thead>
+                <tr>
+                    <th class="col-id sortable-header" data-sort-key="id">ID</th>
+                    <th class="col-subject sortable-header" data-sort-key="subject">Subject</th>
+                    <th class="col-requester sortable-header" data-sort-key="requester_name">Requester</th>
+                    <th class="col-agent sortable-header" data-sort-key="agent_name">Agent</th>
+                    <th class="col-priority sortable-header" data-sort-key="priority_raw">Priority</th>
+                    <th class="col-action-sla sortable-header" data-sort-key="sla_text">Action / SLA</th>
+                    <th class="col-updated sortable-header" data-sort-key="updated_at_str">Updated</th>
+                    <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
+                </tr>
+            </thead>
+            <tbody id="s1-items-body"></tbody>
+        </table>
+        <p id="s1-no-items-message" class="no-items-message" style="display: none;">No tickets currently in this category.</p>
+    </div>
+</div>
 
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-</body>
-</html>
+{# --- Section 2: Customer Replied --- #}
+<div class="widget-container" id="s2-container">
+    <div class="widget-header">
+        <h2>{{ section2_name }} (<span id="s2-item-count">{{ s2_items|length }}</span>)</h2>
+    </div>
+    <div class="widget-content">
+        <table class="item-table" id="s2-item-table">
+            <thead>
+                <tr>
+                    <th class="col-id sortable-header" data-sort-key="id">ID</th>
+                    <th class="col-subject sortable-header" data-sort-key="subject">Subject</th>
+                    <th class="col-requester sortable-header" data-sort-key="requester_name">Requester</th>
+                    <th class="col-agent sortable-header" data-sort-key="agent_name">Agent</th>
+                    <th class="col-priority sortable-header" data-sort-key="priority_raw">Priority</th>
+                    <th class="col-action-sla sortable-header" data-sort-key="sla_text">Action / Status</th>
+                    <th class="col-updated sortable-header" data-sort-key="updated_at_str">Updated</th>
+                    <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
+                </tr>
+            </thead>
+            <tbody id="s2-items-body"></tbody>
+        </table>
+        <p id="s2-no-items-message" class="no-items-message" style="display: none;">No tickets currently have a customer reply.</p>
+    </div>
+</div>
+
+{# --- Section 3: Needs Agent / Update Overdue --- #}
+<div class="widget-container" id="s3-container">
+    <div class="widget-header">
+        <h2>{{ section3_name }} (<span id="s3-item-count">{{ s3_items|length }}</span>)</h2>
+    </div>
+    <div class="widget-content">
+        <table class="item-table" id="s3-item-table">
+             <thead>
+                <tr>
+                    <th class="col-id sortable-header" data-sort-key="id">ID</th>
+                    <th class="col-subject sortable-header" data-sort-key="subject">Subject</th>
+                    <th class="col-requester sortable-header" data-sort-key="requester_name">Requester</th>
+                    <th class="col-agent sortable-header" data-sort-key="agent_name">Agent</th>
+                    <th class="col-priority sortable-header" data-sort-key="priority_raw">Priority</th>
+                    <th class="col-action-sla sortable-header" data-sort-key="sla_text">Action / Status</th>
+                    <th class="col-updated sortable-header" data-sort-key="updated_at_str">Updated</th>
+                    <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
+                </tr>
+            </thead>
+            <tbody id="s3-items-body"></tbody>
+        </table>
+        <p id="s3-no-items-message" class="no-items-message" style="display: none;">No tickets currently need an agent or have an overdue update.</p>
+    </div>
+</div>
+
+{# --- Section 4: Other Active Tickets --- #}
+<div class="widget-container" id="s4-container">
+    <div class="widget-header">
+        <h2>{{ section4_name }} (<span id="s4-item-count">{{ s4_items|length }}</span>)</h2>
+    </div>
+    <div class="widget-content">
+        <table class="item-table" id="s4-item-table">
+            <thead>
+                <tr>
+                    <th class="col-id sortable-header" data-sort-key="id">ID</th>
+                    <th class="col-subject sortable-header" data-sort-key="subject">Subject</th>
+                    <th class="col-requester sortable-header" data-sort-key="requester_name">Requester</th>
+                    <th class="col-agent sortable-header" data-sort-key="agent_name">Agent</th>
+                    <th class="col-priority sortable-header" data-sort-key="priority_raw">Priority</th>
+                    <th class="col-action-sla sortable-header" data-sort-key="status_text">Status</th>
+                    <th class="col-updated sortable-header" data-sort-key="updated_at_str">Updated</th>
+                    <th class="col-created sortable-header" data-sort-key="created_at_str">Created</th>
+                </tr>
+            </thead>
+            <tbody id="s4-items-body"></tbody>
+        </table>
+        <p id="s4-no-items-message" class="no-items-message" style="display: none;">No other active tickets found.</p>
+    </div>
+</div>
+{% endblock %}

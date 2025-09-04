@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Ticket Dash{% endblock %} - Integotec</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layouts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='images/integotec_logo.png') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% block head %}{% endblock %}
+</head>
+<body class="light-mode">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <a href="/">
+                <img src="{{ url_for('static', filename='images/integotec_logo.png') }}" alt="Integotec Logo" class="logo">
+            </a>
+            <span class="logo-text">Ticket Dash</span>
+        </div>
+        <ul class="sidebar-nav">
+            <li>
+                <a href="{{ url_for('dashboard_typed', view_slug='helpdesk') }}" class="{{ 'active' if current_view_slug == 'helpdesk' else '' }}">
+                    <i class="fas fa-headset"></i>
+                    <span>Helpdesk</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('dashboard_typed', view_slug='professional-services') }}" class="{{ 'active' if current_view_slug == 'professional-services' else '' }}">
+                    <i class="fas fa-briefcase"></i>
+                    <span>Pro Services</span>
+                </a>
+            </li>
+             <li>
+                <a href="{{ url_for('dashboard_fun') }}">
+                    <i class="fas fa-gamepad"></i>
+                    <span>Fun Mode</span>
+                </a>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <button id="theme-toggle" class="theme-toggle-btn">
+                <i class="fas fa-moon"></i>
+                <span>Dark Mode</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <header class="main-header">
+            <div class="header-left">
+                <button id="sidebar-toggle" class="sidebar-toggle-btn">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1>{{ page_title_display }} Dashboard</h1>
+            </div>
+            <div class="header-right">
+                <div class="info-metric">
+                    <span>Total Active</span>
+                    <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length + s4_items|length }}</strong>
+                </div>
+                <div class="info-metric">
+                    <span>Last Update</span>
+                    <strong id="dashboard-generated-time">Loading...</strong>
+                </div>
+            </div>
+        </header>
+
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        window.FRESHSERVICE_BASE_URL = "{{ freshservice_base_url }}";
+        window.AUTO_REFRESH_MS = {{ auto_refresh_ms }};
+        window.CURRENT_TICKET_TYPE_SLUG = "{{ current_view_slug }}";
+        window.CURRENT_TICKET_TYPE_DISPLAY = "{{ current_view_display }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

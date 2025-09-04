@@ -1,20 +1,42 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const themeToggle = document.getElementById('theme-toggle');
     const body = document.body;
+    const themeToggle = document.getElementById('theme-toggle');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
     const agentFilter = document.getElementById('agent-filter');
 
-    function applyTheme(theme) {
-        if (theme === 'light') {
-            body.classList.add('light-mode');
-            if (themeToggle) themeToggle.textContent = '🌙 Dark Mode';
-        } else { // Default to dark
-            body.classList.remove('light-mode');
-            if (themeToggle) themeToggle.textContent = '☀️ Light Mode';
+    // --- Sidebar Logic ---
+    function applySidebarState() {
+        const isCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+        if (isCollapsed) {
+            body.classList.add('sidebar-collapsed');
+        } else {
+            body.classList.remove('sidebar-collapsed');
         }
     }
 
-    let currentTheme = localStorage.getItem('theme') || 'dark'; // Default to dark
-    applyTheme(currentTheme);
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+            body.classList.toggle('sidebar-collapsed');
+            localStorage.setItem('sidebar_collapsed', body.classList.contains('sidebar-collapsed'));
+        });
+    }
+
+    // --- Theme Logic ---
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            body.classList.remove('light-mode');
+            body.classList.add('dark-mode');
+            if (themeToggle) {
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i> <span>Light Mode</span>';
+            }
+        } else { // Default to light
+            body.classList.remove('dark-mode');
+            body.classList.add('light-mode');
+            if (themeToggle) {
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i> <span>Dark Mode</span>';
+            }
+        }
+    }
 
     if (themeToggle) {
         themeToggle.addEventListener('click', () => {
@@ -24,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Agent Filter Logic ---
     if (agentFilter) {
         agentFilter.addEventListener('change', () => {
             const selectedAgentId = agentFilter.value;
@@ -37,6 +60,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Initial State Application ---
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    applyTheme(savedTheme);
+    applySidebarState();
+
+
+    // --- Ticket Data Fetching & Rendering Logic (from theme.js) ---
     function formatToLocal(utcDateStringInput, options = {}, dateOnly = false, prefix = "") {
         if (!utcDateStringInput || utcDateStringInput.trim() === 'N/A' || utcDateStringInput.trim() === '') {
             return 'N/A';
@@ -71,16 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    convertAllUTCToLocal(); // Initial conversion
 
     const FRESHSERVICE_BASE_URL = window.FRESHSERVICE_BASE_URL || '';
     const AUTO_REFRESH_INTERVAL_MS = window.AUTO_REFRESH_MS || 0;
     const CURRENT_TICKET_TYPE_SLUG = window.CURRENT_TICKET_TYPE_SLUG || 'incidents';
-    const CURRENT_TICKET_TYPE_DISPLAY = window.CURRENT_TICKET_TYPE_DISPLAY || 'Incident';
 
-
-    window.currentApiData = {}; // To store the latest fetched data for sorting
-
+    window.currentApiData = {};
     let sortState = {
         's1-item-table': { key: null, direction: 'asc' },
         's2-item-table': { key: null, direction: 'asc' },
@@ -119,7 +145,6 @@ document.addEventListener('DOMContentLoaded', () => {
             slaDetailHtml = `<div class="datetime-container" data-utc-datetime="${item.due_by_str}" data-prefix="Due: "><small class="local-datetime">Loading...</small></div>`;
         }
 
-
         return `
         <tr>
         <td class="item-id"><a href="${FRESHSERVICE_BASE_URL}${itemId}" target="_blank">${itemId}</a></td>
@@ -133,20 +158,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </td>
         <td>${updatedFriendly}</td>
         <td>${createdDaysOld}</td>
-        </tr>
-        `;
+        </tr>`;
     }
 
     function updateItemSection(sectionIdPrefix, items) {
         const tableBody = document.getElementById(`${sectionIdPrefix}-items-body`);
         const noItemsMessageElement = document.getElementById(`${sectionIdPrefix}-no-items-message`);
         const sectionItemCountElement = document.getElementById(`${sectionIdPrefix}-item-count`);
-        const tableElement = document.getElementById(`${sectionIdPrefix}-item-table`);
 
-        if (!tableBody || !noItemsMessageElement || !sectionItemCountElement || !tableElement) {
-            console.error(`One or more elements not found for section update: ${sectionIdPrefix}`);
-            return;
-        }
+        if (!tableBody || !noItemsMessageElement || !sectionItemCountElement) return;
 
         sectionItemCountElement.textContent = items.length;
         tableBody.innerHTML = '';
@@ -156,10 +176,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tableBody.innerHTML += renderItemRow(item);
             });
             noItemsMessageElement.style.display = 'none';
-            tableElement.style.display = '';
         } else {
             noItemsMessageElement.style.display = 'block';
-            tableElement.style.display = 'none';
         }
     }
 
@@ -265,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const sortedData = sortData(dataToSort, sortKey, sortState[tableId].direction);
             updateItemSection(sectionPrefix, sortedData);
             updateSortIndicators(tableElement, sortKey, sortState[tableId].direction);
+            convertAllUTCToLocal(); // Re-run date conversion after re-render
         });
     });
 
