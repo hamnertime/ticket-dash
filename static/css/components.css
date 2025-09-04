@@ -17,6 +17,10 @@
     color: var(--text-light); /* White icon on hover */
 }
 
+.sidebar-toggle-btn:focus, .theme-toggle-btn:focus {
+    outline: none; /* Removes the border on click/focus */
+}
+
 .theme-toggle-btn {
     width: 100%;
     display: flex;

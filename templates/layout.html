@@ -52,11 +52,13 @@
             <div class="header-left">
                 <h1>{{ page_title_display }} Dashboard</h1>
             </div>
-            <div class="header-right">
-                <div class="info-metric">
-                    <span>Total Active</span>
+            <div class="header-center">
+                <div class="info-metric centered">
+                    <span>Total Active:</span>
                     <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length + s4_items|length }}</strong>
                 </div>
+            </div>
+            <div class="header-right">
                 <div class="info-metric">
                     <span>Last Update</span>
                     <strong id="dashboard-generated-time">Loading...</strong>
