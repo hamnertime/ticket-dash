@@ -14,10 +14,10 @@
 <body class="light-mode">
     <div class="sidebar">
         <div class="sidebar-header">
-            <a href="/">
-                <img src="{{ url_for('static', filename='images/integotec_logo.png') }}" alt="Integotec Logo" class="logo">
-            </a>
             <span class="logo-text">Ticket Dash</span>
+            <button id="sidebar-toggle" class="sidebar-toggle-btn">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
         <ul class="sidebar-nav">
             <li>
@@ -50,9 +50,6 @@
     <div class="main-content">
         <header class="main-header">
             <div class="header-left">
-                <button id="sidebar-toggle" class="sidebar-toggle-btn">
-                    <i class="fas fa-bars"></i>
-                </button>
                 <h1>{{ page_title_display }} Dashboard</h1>
             </div>
             <div class="header-right">

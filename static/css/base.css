@@ -1,86 +1,76 @@
 /* static/css/base.css */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
 :root {
-    /* Color Palette */
-    --gold: #FFD700;
-    --blue-primary: #007bff;
-    --blue-secondary: #0056b3;
-    --text-light: #f8f9fa;
-    --text-dark: #212529;
-    --border-color-light: #dee2e6;
-    --border-color-dark: #495057;
+    --font-family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-size-base: 1rem;
+    --line-height-base: 1.5;
 
-    /* Light Mode Theme */
-    --bg-primary-light: #ffffff;
-    --bg-secondary-light: #f8f9fa;
-    --bg-tertiary-light: #e9ecef;
-    --text-primary-light: #212529;
-    --text-secondary-light: #6c757d;
-    --accent-light: var(--blue-primary);
-
-    /* Dark Mode Theme */
-    --bg-primary-dark: #212529;
-    --bg-secondary-dark: #343a40;
-    --bg-tertiary-dark: #495057;
-    --text-primary-dark: #f8f9fa;
-    --text-secondary-dark: #adb5bd;
-    --accent-dark: var(--gold);
-
-    /* Sizing and Shadows */
-    --sidebar-width: 250px;
-    --sidebar-width-collapsed: 60px;
-    --header-height: 60px;
-    --border-radius: 0.375rem;
-    --box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    --box-shadow-dark: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
-
-    /* Transitions */
     --transition-speed: 0.2s;
-}
+    --border-radius: 8px;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 
-body.light-mode {
-    --bg-primary: var(--bg-primary-light);
-    --bg-secondary: var(--bg-secondary-light);
-    --bg-tertiary: var(--bg-tertiary-light);
-    --text-primary: var(--text-primary-light);
-    --text-secondary: var(--text-secondary-light);
-    --accent: var(--accent-light);
-    --border-color: var(--border-color-light);
-    --shadow: var(--box-shadow);
+    --header-height: 60px;
+    --sidebar-width: 250px;
+    --sidebar-width-collapsed: 80px;
+
+    /* Light Mode Color Scheme */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-tertiary: #e9ecef;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-light: #ffffff;
+    --text-dark: #000000;
+    --border-color: #dee2e6;
+    --accent: #D4AF37; /* Updated Gold */
+    --accent-hover: #b89b3c; /* Added Hover Gold */
+
+    --color-red: #dc3545;
+    --color-green: #28a745;
+    --color-blue: #007bff;
 }
 
 body.dark-mode {
-    --bg-primary: var(--bg-primary-dark);
-    --bg-secondary: var(--bg-secondary-dark);
-    --bg-tertiary: var(--bg-tertiary-dark);
-    --text-primary: var(--text-primary-dark);
-    --text-secondary: var(--text-secondary-dark);
-    --accent: var(--accent-dark);
-    --border-color: var(--border-color-dark);
-    --shadow: var(--box-shadow-dark);
+    --bg-primary: #2c2c2c;      /* Sidebar, Header background */
+    --bg-secondary: #1a1a1a;    /* Main content background */
+    --bg-tertiary: #3c424a;     /* Hover color */
+    --text-primary: #f8f9fa;
+    --text-secondary: #adb5bd;
+    --border-color: #444444;
 }
 
-* {
+*, *::before, *::after {
     box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
-    background-color: var(--bg-secondary);
+    margin: 0;
+    font-family: var(--font-family-sans-serif);
+    font-size: var(--font-size-base);
+    font-weight: 400;
+    line-height: var(--line-height-base);
     color: var(--text-primary);
-    transition: background-color var(--transition-speed) ease-in-out, color var(--transition-speed) ease-in-out;
-    font-size: 16px;
-    line-height: 1.5;
+    background-color: var(--bg-secondary);
+    transition: background-color var(--transition-speed), color var(--transition-speed);
 }
 
 a {
     color: var(--accent);
     text-decoration: none;
+    background-color: transparent;
 }
 
 a:hover {
+    color: var(--accent-hover);
     text-decoration: underline;
+}
+
+button:focus {
+    outline: 1px dotted;
+    outline: 5px auto -webkit-focus-ring-color;
 }
