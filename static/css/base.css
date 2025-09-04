@@ -76,3 +76,44 @@ button:focus {
     outline: 1px dotted;
     outline: 5px auto -webkit-focus-ring-color;
 }
+
+.pulse-red {
+    animation: pulse-red 1s infinite;
+}
+
+@keyframes pulse-red {
+    0% {
+        color: var(--text-primary);
+    }
+    50% {
+        color: var(--color-red);
+    }
+    100% {
+        color: var(--text-primary);
+    }
+}
+
+.siren {
+    display: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    animation: siren-spin 0.5s linear infinite;
+    position: relative;
+    margin: 0 10px;
+}
+
+.siren.active {
+    display: inline-block;
+}
+
+@keyframes siren-spin {
+    0% {
+        transform: rotate(0deg);
+        background-image: linear-gradient(to right, var(--color-red) 50%, var(--color-blue) 50%);
+    }
+    100% {
+        transform: rotate(360deg);
+        background-image: linear-gradient(to right, var(--color-red) 50%, var(--color-blue) 50%);
+    }
+}

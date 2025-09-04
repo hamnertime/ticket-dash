@@ -50,12 +50,14 @@
     <div class="main-content">
         <header class="main-header">
             <div class="header-left">
-                <h1>{{ page_title_display }} Dashboard</h1>
+                <h1>{{ page_title_display }}</h1>
             </div>
             <div class="header-center">
                 <div class="info-metric centered">
-                    <span>Total Active:</span>
+                    <div class="siren" id="siren-left"></div>
+                    <span class="total-active-label"><strong>Total Active:</strong></span>
                     <strong id="total-active-items-count">{{ s1_items|length + s2_items|length + s3_items|length + s4_items|length }}</strong>
+                    <div class="siren" id="siren-right"></div>
                 </div>
             </div>
             <div class="header-right">

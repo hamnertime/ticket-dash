@@ -187,7 +187,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             window.currentApiData = data;
 
-            document.getElementById('total-active-items-count').textContent = data.total_active_items;
+            const totalActiveItems = data.total_active_items;
+            const totalActiveItemsCount = document.getElementById('total-active-items-count');
+            totalActiveItemsCount.textContent = totalActiveItems;
+            const sirenLeft = document.getElementById('siren-left');
+            const sirenRight = document.getElementById('siren-right');
+
+            if (totalActiveItems >= 100) {
+                totalActiveItemsCount.classList.add('pulse-red');
+            } else {
+                totalActiveItemsCount.classList.remove('pulse-red');
+            }
+
+            if (totalActiveItems >= 110) {
+                sirenLeft.classList.add('active');
+                sirenRight.classList.add('active');
+            } else {
+                sirenLeft.classList.remove('active');
+                sirenRight.classList.remove('active');
+            }
 
             let s1Data = data.s1_items || [];
             let s2Data = data.s2_items || [];
