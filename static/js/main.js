@@ -114,22 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
         's4-item-table': { key: null, direction: 'asc' }
     };
 
-    function formatItemSubjectForRender(subject, descriptionText) {
-        let subjectText = subject ? subject.substring(0, 60) + (subject.length > 60 ? '...' : '') : 'No Subject';
-        let tooltipHtml = '';
-        if (descriptionText) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = descriptionText;
-            const strippedDescription = tempDiv.textContent || tempDiv.innerText || "";
-            const truncatedDescription = strippedDescription.substring(0, 300) + (strippedDescription.length > 300 ? '...' : '');
-            tooltipHtml = `<span class="tooltiptext">${truncatedDescription.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`;
-        }
-        return `${subjectText}${tooltipHtml}`;
-    }
-
-    function renderItemRow(item) {
+    function renderItemRow(item, sectionIdPrefix) {
         const itemId = item.id || 'N/A';
-        const subjectHtml = formatItemSubjectForRender(item.subject, item.description_text);
+        const subjectText = item.subject ? item.subject.substring(0, 60) + (item.subject.length > 60 ? '...' : '') : 'No Subject';
         const requesterName = item.requester_name || 'N/A';
         const agentName = item.agent_name || 'Unassigned';
         const priorityText = item.priority_text || 'N/A';
@@ -148,7 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return `
         <tr>
         <td class="item-id"><a href="${FRESHSERVICE_BASE_URL}${itemId}" target="_blank">${itemId}</a></td>
-        <td class="item-subject description-tooltip">${subjectHtml}</td>
+        <td class="item-subject">
+        <a href="#" class="modal-trigger" data-item-id="${itemId}" data-section-prefix="${sectionIdPrefix}">
+        ${subjectText}
+        </a>
+        </td>
         <td>${requesterName}</td>
         <td>${agentName}</td>
         <td><span class="priority-${priorityText}">${priorityText}</span></td>
@@ -173,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (items && items.length > 0) {
             items.forEach(item => {
-                tableBody.innerHTML += renderItemRow(item);
+                tableBody.innerHTML += renderItemRow(item, sectionIdPrefix);
             });
             noItemsMessageElement.style.display = 'none';
         } else {
@@ -286,6 +277,72 @@ document.addEventListener('DOMContentLoaded', () => {
             convertAllUTCToLocal(); // Re-run date conversion after re-render
         });
     });
+
+    // --- Modal Logic ---
+    const modal = document.getElementById('ticket-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalDetailsGrid = document.getElementById('modal-details-grid');
+    const modalDescription = document.getElementById('modal-description');
+    const closeModalBtn = modal.querySelector('.modal-close-btn');
+
+    function createDetailRow(label, value) {
+        return `
+        <div class="modal-detail-label">${label}</div>
+        <div class="modal-detail-value">${value || 'N/A'}</div>
+        `;
+    }
+
+    function openModal(item) {
+        if (!item) return;
+
+        modalTitle.textContent = `Ticket #${item.id}: ${item.subject}`;
+
+        let detailsHtml = '';
+        detailsHtml += createDetailRow('Requester', item.requester_name);
+        detailsHtml += createDetailRow('Agent', item.agent_name || 'Unassigned');
+        detailsHtml += createDetailRow('Priority', `<span class="priority-${item.priority_text}">${item.priority_text}</span>`);
+        detailsHtml += createDetailRow('Status', item.sla_text || 'N/A');
+        detailsHtml += createDetailRow('Created', `${item.created_days_old} ago (${formatToLocal(item.created_at_str)})`);
+        detailsHtml += createDetailRow('Last Updated', `${item.updated_friendly} ago (${formatToLocal(item.updated_at_str)})`);
+
+        modalDetailsGrid.innerHTML = detailsHtml;
+
+        // Sanitize and display description
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = item.description_text || "No description provided.";
+        modalDescription.textContent = tempDiv.textContent || tempDiv.innerText || "";
+
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    document.addEventListener('click', function(event) {
+        const trigger = event.target.closest('.modal-trigger');
+        if (trigger) {
+            event.preventDefault();
+            const itemId = trigger.dataset.itemId;
+            const sectionPrefix = trigger.dataset.sectionPrefix;
+            const itemArray = window.currentApiData[`${sectionPrefix}_items`] || [];
+            const item = itemArray.find(i => i.id == itemId);
+            openModal(item);
+        }
+    });
+
+    closeModalBtn.addEventListener('click', closeModal);
+    window.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.style.display === 'flex') {
+            closeModal();
+        }
+    });
+
 
     if (AUTO_REFRESH_INTERVAL_MS > 0) {
         setTimeout(refreshTicketData, 100);
