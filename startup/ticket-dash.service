@@ -1,7 +1,7 @@
 [Unit]
 Description=Ticket Dash Flask Application
 After=network.target
-# If your ticket_watcher.py also needs to run as a service and gui.py depends on it,
+# If your ticket_watcher.py also needs to run as a service and main.py depends on it,
 # you might add:
 # Wants=ticket-watcher.service
 # After=network.target ticket-watcher.service
@@ -14,8 +14,8 @@ Group=integotec
 WorkingDirectory=/home/integotec/ticket-dash
 
 # The command to start your application
-# If using a virtualenv: /usr/bin/authbind --deep /home/integotec/ticket-dash/pyenv/bin/python3 /home/integotec/ticket-dash/gui.py
-ExecStart=/usr/bin/authbind --deep python3 /home/integotec/ticket-dash/gui.py
+# If using a virtualenv: /usr/bin/authbind --deep /home/integotec/ticket-dash/pyenv/bin/python3 /home/integotec/ticket-dash/main.py
+ExecStart=/usr/bin/authbind --deep python3 /home/integotec/ticket-dash/main.py
 
 # Restart policy
 Restart=always

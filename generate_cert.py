@@ -99,7 +99,7 @@ def generate_self_signed_cert():
         print(f"❌ Error writing certificate file: {e}")
         return
 
-    print("\nSuccess! Place these two files in the same directory as your gui.py script.")
+    print("\nSuccess! Place these two files in the same directory as your main.py script.")
 
 
 if __name__ == "__main__":
@@ -114,4 +114,3 @@ if __name__ == "__main__":
             generate_self_signed_cert()
     else:
         generate_self_signed_cert()
-

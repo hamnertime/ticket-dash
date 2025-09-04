@@ -488,8 +488,7 @@ if __name__ == '__main__':
 
     use_https = cert_exists and key_exists
     protocol = "https" if use_https else "http"
-    # --- PORT CHANGE HERE ---
-    port = 6969 if use_https else 5001
+    port = 5001 if use_https else 5001
     ssl_context = (cert_path, key_path) if use_https else None
 
     if use_https:

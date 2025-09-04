@@ -19,9 +19,12 @@ venv/
 logs/
 
 # Secrets - CRITICAL
-token.txt # For Freshservice API Key
+token.txt
 *.txt
 tickets/*
+ticket_poller.lock
+agents.txt
+requesters.txt
 
 # SSL Certificates and Keys (if self-signed or not meant for public repo)
 # If your certs are for public use and part of deployment, you might reconsider these.
@@ -36,6 +39,4 @@ Thumbs.db
 # Other common files to ignore
 *.bak
 *.tmp
-ticket_poller.lock
-agents.txt
-requesters.txt
+

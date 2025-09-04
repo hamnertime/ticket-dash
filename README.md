@@ -19,7 +19,7 @@ The dashboard offers categorized views of tickets, SLA status indicators, priori
 * **Adaptable:** The data source (`ticket_watcher.py`) can be rewritten to support other ticketing systems while keeping the Flask GUI largely the same.
 * **Secure Setup:** Includes options for running over HTTPS.
 * **Luxafor Integration:** `blinky.py` script provides visual ticket status updates via a Luxafor USB LED indicator.
-* **Systemd Services:** Includes service files for running `gui.py`, `ticket_watcher.py`, and `blinky.py` as background services on boot.
+* **Systemd Services:** Includes service files for running `main.py`, `ticket_watcher.py`, and `blinky.py` as background services on boot.
 
 ## Tech Stack
 
@@ -31,7 +31,7 @@ The dashboard offers categorized views of tickets, SLA status indicators, priori
 
 ## Project Files and Directories
 
-* **`gui.py`**: The main Flask web application that serves the dashboard.
+* **`main.py`**: The main Flask web application that serves the dashboard.
 * **`ticket_watcher.py`**: Script responsible for fetching ticket data (e.g., from Freshservice) and updating the `./tickets/` directory.
 * **`blinky.py`**: Script to control a Luxafor USB LED indicator based on ticket status.
 * **`update_requesters.py`**: Script to fetch and update requester information.
@@ -42,7 +42,7 @@ The dashboard offers categorized views of tickets, SLA status indicators, priori
 * **`templates/`**: Contains HTML templates.
     * **`templates/index.html`**: The main HTML template for the dashboard.
 * **`startup/`**: (Recommended) Contains systemd service files for managing the application components.
-    * `ticket-dash.service`: For `gui.py`.
+    * `ticket-dash.service`: For `main.py`.
     * `ticket-watcher.service`: For `ticket_watcher.py`.
     * `blinky.service`: For `blinky.py`.
 * **`token.txt`**: Stores the Freshservice API key. This is used by `ticket_watcher.py` and `update_requesters.py`.
@@ -103,14 +103,14 @@ The dashboard offers categorized views of tickets, SLA status indicators, priori
         ```
         Ensure this user has appropriate ownership and permissions for the `ticket-dash` directory and its contents, especially write access to the `tickets` directory, `ticket_poller.log`, and `ticket_poller.lock`.
 
-5.  **SSL/HTTPS (Optional but Recommended for `gui.py`):**
-    * If you want to run the dashboard over HTTPS (as configured in `gui.py` to run on port 443 by default if certs are present):
+5.  **SSL/HTTPS (Optional but Recommended for `main.py`):**
+    * If you want to run the dashboard over HTTPS (as configured in `main.py` to run on port 443 by default if certs are present):
         * Place your SSL certificate (`cert.pem`) and private key (`key.pem`) in the root directory of the project (e.g., `/home/integotec/ticket-dash/`).
-        * Ensure the user running the `gui.py` service (e.g., `ticketdashuser`) has read access to these files.
+        * Ensure the user running the `main.py` service (e.g., `ticketdashuser`) has read access to these files.
         * The application includes a fallback to HTTP on port 5001 if `cert.pem` or `key.pem` are not found.
 
-6.  **`authbind` for Port 443 (for `gui.py`):**
-    * To allow the `gui.py` service to run on port 443 without root:
+6.  **`authbind` for Port 443 (for `main.py`):**
+    * To allow the `main.py` service to run on port 443 without root:
         ```bash
         sudo apt-get update
         sudo apt-get install authbind
@@ -143,16 +143,16 @@ You can run the components manually for testing, but for production, using the p
     python3 ticket_watcher.py
     ```
 
-3.  **`gui.py` (Flask Web Application):**
+3.  **`main.py` (Flask Web Application):**
     * Run this in a separate terminal.
     * If SSL and `authbind` are configured, and you're in the project directory:
         ```bash
-        authbind --deep python3 gui.py
+        authbind --deep python3 main.py
         ```
         Access at: `https://your_server_ip_or_domain:443`
     * For HTTP on port 5001:
         ```bash
-        python3 gui.py
+        python3 main.py
         ```
         Access at: `http://your_server_ip_or_domain:5001`
 
@@ -164,7 +164,7 @@ You can run the components manually for testing, but for production, using the p
 
 ### Running as Systemd Services (Recommended for Production/Autostart)
 
-This project includes example `systemd` service files in the `./startup/` directory (or you can create them as described below). These files allow `gui.py`, `ticket_watcher.py`, and `blinky.py` to run as background services and start automatically on boot.
+This project includes example `systemd` service files in the `./startup/` directory (or you can create them as described below). These files allow `main.py`, `ticket_watcher.py`, and `blinky.py` to run as background services and start automatically on boot.
 
 **Assumptions for service files:**
 * Your project is in `/home/integotec/ticket-dash`.
@@ -175,7 +175,7 @@ This project includes example `systemd` service files in the `./startup/` direct
 
 1.  **Prepare Service Files:**
     Ensure you have the following service files (e.g., in a `./startup/` directory within your project, or create them directly in `/etc/systemd/system/`):
-    * `ticket-dash.service` (for `gui.py`)
+    * `ticket-dash.service` (for `main.py`)
     * `ticket-watcher.service` (for `ticket_watcher.py`)
     * `blinky.service` (for `blinky.py`)
     *(Refer to previous conversation or generate them based on the templates provided if you don't have them.)*
@@ -220,7 +220,7 @@ This project includes example `systemd` service files in the `./startup/` direct
     sudo journalctl -u ticket-watcher.service -f
     sudo journalctl -u blinky.service -f
     ```
-    
+
 **Automating `update_requesters.py` (Optional):**
 
 If you want `update_requesters.py` to run automatically, you can set up a cron job. For example, to run it daily at 3:00 AM:
@@ -237,26 +237,26 @@ Once running (ideally via `systemd` services), the dashboard will be accessible 
 * Tickets are displayed in three main sections.
 * Use the theme toggle button (☀️/🌙) in the top info bar to switch between light and dark modes.
 * Hover over truncated ticket subjects to view a longer description in a tooltip.
-* Click on a ticket ID to open the corresponding ticket directly in Freshservice (ensure `FRESHSERVICE_DOMAIN` in `gui.py` is correct).
+* Click on a ticket ID to open the corresponding ticket directly in Freshservice (ensure `FRESHSERVICE_DOMAIN` in `main.py` is correct).
 * The Luxafor light (if `blinky.py` is running) will change color based on ticket status.
 
 ## Adapting for Other Ticketing Systems
 
-The core of the data display logic in `gui.py` reads ticket information from JSON files in the `./tickets/` directory. To adapt this dashboard for a different ticketing system (e.g., Jira, Zendesk, ServiceNow):
+The core of the data display logic in `main.py` reads ticket information from JSON files in the `./tickets/` directory. To adapt this dashboard for a different ticketing system (e.g., Jira, Zendesk, ServiceNow):
 
 1.  **Rewrite `ticket_watcher.py`:**
     * Update this script to connect to the API of your chosen ticketing system.
     * Fetch the required ticket fields (ID, subject, status, priority, requester, agent, creation/update times, description, etc.).
-    * Transform the data into the JSON structure that `gui.py` expects and save each ticket as a separate file in the `./tickets/` directory. The existing `.txt` files (which are JSON) in the `tickets` directory can serve as a structural reference.
+    * Transform the data into the JSON structure that `main.py` expects and save each ticket as a separate file in the `./tickets/` directory. The existing `.txt` files (which are JSON) in the `tickets` directory can serve as a structural reference.
 
 2.  **Adjust Mappings (if needed):**
     * Update `agents.txt` and `requesters.txt` if the ID formats or sources change.
     * You might need to adjust how `responder_id` (agent) and `requester_id` are extracted and mapped.
 
-3.  **Review `gui.py` Logic:**
-    * Status IDs (`OPEN_INCIDENT_STATUS_ID`, `WAITING_ON_AGENT`, etc.) will likely be different for other systems. Update these constants at the top of `gui.py`.
+3.  **Review `main.py` Logic:**
+    * Status IDs (`OPEN_INCIDENT_STATUS_ID`, `WAITING_ON_AGENT`, etc.) will likely be different for other systems. Update these constants at the top of `main.py`.
     * The categorization logic in `load_and_process_incidents()` might need to be tweaked based on the new system's statuses and workflow.
-    * Ensure the JSON fields `gui.py` expects (e.g., `subject`, `priority_raw`, `status_raw`, `updated_at_str`, `created_at_str`, `fr_due_by_str`, `description_text`, `responder_id`, `requester_id`) are provided by your new `ticket_watcher.py`.
+    * Ensure the JSON fields `main.py` expects (e.g., `subject`, `priority_raw`, `status_raw`, `updated_at_str`, `created_at_str`, `fr_due_by_str`, `description_text`, `responder_id`, `requester_id`) are provided by your new `ticket_watcher.py`.
 
 ## Contributing
 
