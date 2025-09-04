@@ -1,9 +1,11 @@
 import os
 import json
 import datetime
-from flask import Flask, render_template, jsonify, abort, redirect, url_for, request
+from flask import Flask, render_template, jsonify, abort, redirect, url_for, request, flash
 import ssl
 import logging
+from apscheduler.schedulers.background import BackgroundScheduler
+import ticket_watcher # Import the ticket_watcher script
 
 # --- Configuration ---
 TICKETS_DIR = "./tickets"
@@ -42,6 +44,7 @@ SSL_CERT_FILE = './cert.pem'
 SSL_KEY_FILE = './key.pem'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
+app.secret_key = os.urandom(24) # Needed for flashing messages
 
 if not app.debug:
     app.logger.setLevel(logging.INFO)
@@ -64,6 +67,22 @@ SLA_UPDATE_THRESHOLDS = {
     2: datetime.timedelta(days=3),    # Medium
     1: datetime.timedelta(days=4),    # Low
 }
+
+# --- Scheduler Setup ---
+scheduler = BackgroundScheduler()
+scheduler.start(paused=True)  # Start paused, will be started from settings
+POLL_INTERVAL = 180 # Default to 3 minutes (180 seconds)
+
+@scheduler.scheduled_job('interval', seconds=POLL_INTERVAL, id='ticket_watcher_job')
+def run_ticket_watcher():
+    """ Job to run the ticket watcher script """
+    app.logger.info("Scheduler is running the ticket watcher...")
+    try:
+        ticket_watcher.run_watcher_once()
+        app.logger.info("Ticket watcher run completed successfully.")
+    except Exception as e:
+        app.logger.error(f"Error running ticket watcher from scheduler: {e}", exc_info=True)
+
 
 def load_mapping_file(file_path, item_type_name="item"):
     mapping = {}
@@ -337,8 +356,38 @@ def load_and_process_tickets(current_view_slug, agent_id=None):
     return list_section1_items, list_section2_items, list_section3_items, list_section4_items
 
 
-# --- Routes (unchanged) ---
-# ...
+# --- Routes ---
+
+# --- Settings Page ---
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    global POLL_INTERVAL
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'start':
+            scheduler.resume()
+            flash('Ticket watcher started.', 'success')
+        elif action == 'stop':
+            scheduler.pause()
+            flash('Ticket watcher stopped.', 'success')
+        elif action == 'update_interval':
+            try:
+                new_interval = int(request.form.get('interval', POLL_INTERVAL))
+                if new_interval >= 30:
+                    POLL_INTERVAL = new_interval
+                    scheduler.reschedule_job('ticket_watcher_job', trigger='interval', seconds=POLL_INTERVAL)
+                    flash(f'Polling interval updated to {POLL_INTERVAL} seconds.', 'success')
+                else:
+                    flash('Interval must be at least 30 seconds.', 'error')
+            except (ValueError, TypeError):
+                flash('Invalid interval value.', 'error')
+
+    status = "Running" if scheduler.running and scheduler.get_job('ticket_watcher_job').next_run_time else "Stopped"
+
+    return render_template('settings.html',
+                           scheduler_status=status,
+                           poll_interval=POLL_INTERVAL)
+
 
 # --- Main Dashboard Route ---
 @app.route('/')
@@ -472,6 +521,11 @@ if __name__ == '__main__':
     if not AGENT_MAPPING: app.logger.warning(f"Agent mapping from '{AGENTS_FILE}' is empty or failed to load.")
     REQUESTER_MAPPING = load_mapping_file(REQUESTERS_FILE, "requester")
     if not REQUESTER_MAPPING: app.logger.warning(f"Requester mapping from '{REQUESTERS_FILE}' is empty or failed to load.")
+
+    # Start the scheduler
+    scheduler.resume()
+    app.logger.info(f"Ticket watcher scheduler started with a {POLL_INTERVAL} second interval.")
+
 
     app.logger.info(f"Starting Flask app. Data directory: '{os.path.abspath(TICKETS_DIR)}'")
     app.logger.info(f"FR SLA Critical: < {FR_SLA_CRITICAL_HOURS} hrs, Warning: < {FR_SLA_WARNING_HOURS} hrs.")

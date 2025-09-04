@@ -26,7 +26,6 @@ DELAY_BETWEEN_DETAIL_FETCHES = 0.75
 
 TICKETS_DIR = "./tickets"
 ARCHIVE_DIR_BASE = os.path.join(TICKETS_DIR, "archive")
-POLL_INTERVAL = 120 # MODIFIED: Adjusted polling interval
 LOG_FILE = "./ticket_poller.log"
 
 # --- Logging Function ---
@@ -43,6 +42,14 @@ def log_message(message, is_error=False):
 
 # --- Helper Function to Read API Key ---
 def read_api_key(file_path):
+    """
+    Reads the API key from the specified file.
+    Raises:
+        FileNotFoundError: If the token file cannot be found.
+        ValueError: If the token file is empty.
+    Returns:
+        str: The API key.
+    """
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         abs_file_path = os.path.join(script_dir, file_path)
@@ -54,15 +61,16 @@ def read_api_key(file_path):
         with open(abs_file_path, 'r') as f:
             api_key = f.read().strip()
             if not api_key:
-                log_message(f"Error: Token file '{abs_file_path}' is empty.", is_error=True)
-                sys.exit(1)
+                # MODIFIED: Raise ValueError instead of sys.exit
+                raise ValueError(f"Token file is empty: {abs_file_path}")
             return api_key
     except FileNotFoundError:
-        log_message(f"Error: Token file '{abs_file_path}' not found.", is_error=True)
-        sys.exit(1)
+        # MODIFIED: Re-raise FileNotFoundError with a more descriptive message
+        raise FileNotFoundError(f"Token file not found: {abs_file_path}")
     except Exception as e:
-        log_message(f"Error reading token file '{abs_file_path}': {e}", is_error=True)
-        sys.exit(1)
+        # MODIFIED: Wrap other exceptions
+        raise IOError(f"Error reading token file '{abs_file_path}': {e}")
+
 
 # --- Ensure Directories Exist ---
 def ensure_directories():
@@ -72,7 +80,8 @@ def ensure_directories():
         log_message(f"Ensured directories '{TICKETS_DIR}' and '{ARCHIVE_DIR_BASE}' exist.")
     except OSError as e:
         log_message(f"Error creating directories: {e}", is_error=True)
-        sys.exit(1)
+        # This can be a critical error, so we raise it to stop execution.
+        raise
 
 # --- Get Existing Ticket IDs from Filesystem ---
 def get_local_ticket_ids(directory):
@@ -128,7 +137,7 @@ def archive_ticket_file(ticket_id):
 
 
 # --- Fetch Filtered Ticket List (Step 1) ---
-# API Query only filters by status. Type filtering happens after detail fetch.
+# ... (This function remains unchanged)
 def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type):
     all_basic_tickets = []
     page = 1
@@ -208,6 +217,7 @@ def get_filtered_ticket_list(base_url, headers, status_ids, order_by, order_type
     return all_basic_tickets
 
 # --- Fetch Single Ticket Details with Stats (Step 2) ---
+# ... (This function remains unchanged)
 def get_ticket_details_with_stats(ticket_id, base_url, headers):
     detail_endpoint = f"{base_url}/api/v2/tickets/{ticket_id}"
     params = {'include': 'stats'}
@@ -255,20 +265,16 @@ def get_ticket_details_with_stats(ticket_id, base_url, headers):
             return None
     return None
 
-# --- Main Background Process Loop ---
-def main_loop():
-    log_message("🚀 Starting Freshservice Ticket Poller")
-    log_message(f"Polling interval: {POLL_INTERVAL} seconds.")
-    log_message(f"Tickets directory: '{TICKETS_DIR}'")
-    log_message(f"Archive directory base: '{ARCHIVE_DIR_BASE}'")
-    log_message(f"Fetching tickets with status IDs: {STATUS_IDS_TO_INCLUDE}")
-    log_message(f"Max pages per API list fetch: {MAX_PAGES}, Tickets per page: {TICKETS_PER_PAGE}")
-    log_message(f"Delay between individual ticket detail fetches: {DELAY_BETWEEN_DETAIL_FETCHES}s")
-    log_message(f"Creating local files for tickets of types: {TYPES_TO_INCLUDE}") # MODIFIED Log
+def run_watcher_once():
+    """
+    This function runs a single cycle of the ticket watcher.
+    """
+    log_message("--- Watcher Cycle Start ---")
+    current_cycle_start_time = time.time()
 
-    ensure_directories()
+    # ensure_directories() and read_api_key() are now called from the main block
+    # to allow for proper exception handling before the main logic runs.
     API_KEY = read_api_key(TOKEN_FILE)
-    log_message(f"API Key loaded: {API_KEY[:4]}...{API_KEY[-4:] if len(API_KEY) > 8 else API_KEY[:4] + '...'}")
 
     auth_str = f"{API_KEY}:X"
     encoded_auth = base64.b64encode(auth_str.encode()).decode()
@@ -278,97 +284,85 @@ def main_loop():
         "Authorization": f"Basic {encoded_auth}"
     }
 
-    while True:
-        current_cycle_start_time = time.time()
-        log_message("--- Poll Cycle Start ---")
+    basic_ticket_data_list = get_filtered_ticket_list(
+        BASE_URL, headers, STATUS_IDS_TO_INCLUDE, ORDER_BY_FIELD, ORDER_TYPE
+    )
 
-        basic_ticket_data_list = get_filtered_ticket_list(
-            BASE_URL, headers, STATUS_IDS_TO_INCLUDE, ORDER_BY_FIELD, ORDER_TYPE
-        )
+    if basic_ticket_data_list is None:
+        log_message("API fetch for ticket list failed. Exiting cycle.", is_error=True)
+        return
 
-        if basic_ticket_data_list is None:
-            log_message("API fetch for ticket list failed. Retrying next cycle.", is_error=True)
-            # Calculate sleep time carefully if the cycle was short due to immediate failure
-            cycle_duration = time.time() - current_cycle_start_time
-            sleep_duration = max(0, POLL_INTERVAL - cycle_duration)
-            if sleep_duration > 0: time.sleep(sleep_duration)
-            continue
+    processed_ticket_data_list = []
+    if not basic_ticket_data_list:
+        log_message("No tickets found in the initial list fetch for the given criteria.")
+    else:
+        log_message(f"Fetched {len(basic_ticket_data_list)} basic ticket entries. Now fetching details and filtering for types: {TYPES_TO_INCLUDE}...")
+        for i, basic_ticket in enumerate(basic_ticket_data_list):
+            ticket_id = basic_ticket.get('id')
+            if not ticket_id:
+                log_message(f"Skipping basic ticket data without ID: {basic_ticket}", is_error=True)
+                continue
 
-        processed_ticket_data_list = [] # Renamed from enriched_ticket_data_list for clarity
-        if not basic_ticket_data_list:
-            log_message("No tickets found in the initial list fetch for the given criteria.")
-        else:
-            log_message(f"Fetched {len(basic_ticket_data_list)} basic ticket entries. Now fetching details and filtering for types: {TYPES_TO_INCLUDE}...")
-            for i, basic_ticket in enumerate(basic_ticket_data_list):
-                ticket_id = basic_ticket.get('id')
-                if not ticket_id:
-                    log_message(f"Skipping basic ticket data without ID: {basic_ticket}", is_error=True)
-                    continue
+            detailed_ticket = get_ticket_details_with_stats(ticket_id, BASE_URL, headers)
+            if detailed_ticket:
+                ticket_type = detailed_ticket.get('type')
+                if ticket_type in TYPES_TO_INCLUDE:
+                    processed_ticket_data_list.append(detailed_ticket)
+            else:
+                log_message(f"Failed to fetch details for ticket ID {ticket_id}. It will be excluded.", is_error=True)
 
-                detailed_ticket = get_ticket_details_with_stats(ticket_id, BASE_URL, headers)
-                if detailed_ticket:
-                    ticket_type = detailed_ticket.get('type')
-                    # MODIFIED: Filter to include types from TYPES_TO_INCLUDE list
-                    if ticket_type in TYPES_TO_INCLUDE:
-                        processed_ticket_data_list.append(detailed_ticket)
-                    # else:
-                        # log_message(f"Ticket ID {ticket_id} (Type: {ticket_type}) is not in TYPES_TO_INCLUDE. Skipping.")
-                else:
-                    log_message(f"Failed to fetch details for ticket ID {ticket_id}. It will be excluded.", is_error=True)
+            if i < len(basic_ticket_data_list) - 1:
+                time.sleep(DELAY_BETWEEN_DETAIL_FETCHES)
+        log_message(f"After detail fetch and type filtering, {len(processed_ticket_data_list)} tickets of types {TYPES_TO_INCLUDE} remain for processing.")
 
-                if i < len(basic_ticket_data_list) - 1:
-                    time.sleep(DELAY_BETWEEN_DETAIL_FETCHES)
-            log_message(f"After detail fetch and type filtering, {len(processed_ticket_data_list)} tickets of types {TYPES_TO_INCLUDE} remain for processing.")
+    api_ticket_ids_for_saving = set()
+    if processed_ticket_data_list:
+        for ticket_data in processed_ticket_data_list:
+            if isinstance(ticket_data, dict) and 'id' in ticket_data:
+                 api_ticket_ids_for_saving.add(ticket_data['id'])
+    log_message(f"API returned {len(api_ticket_ids_for_saving)} unique ticket IDs of specified types this cycle.")
 
-        api_ticket_ids_for_saving = set() # Renamed for clarity
-        if processed_ticket_data_list:
-            for ticket_data in processed_ticket_data_list:
-                if isinstance(ticket_data, dict) and 'id' in ticket_data:
-                     api_ticket_ids_for_saving.add(ticket_data['id'])
-        log_message(f"API returned {len(api_ticket_ids_for_saving)} unique ticket IDs of specified types this cycle.")
+    local_ticket_ids_before_processing = get_local_ticket_ids(TICKETS_DIR)
+    log_message(f"State: {len(local_ticket_ids_before_processing)} local files, {len(api_ticket_ids_for_saving)} FreshService tickets of specified types are active.")
 
-        local_ticket_ids_before_processing = get_local_ticket_ids(TICKETS_DIR)
-        log_message(f"State: {len(local_ticket_ids_before_processing)} local files, {len(api_ticket_ids_for_saving)} FreshService tickets of specified types are active.")
+    active_files_written_count = 0
+    if processed_ticket_data_list:
+        for ticket_data in processed_ticket_data_list:
+            if isinstance(ticket_data, dict) and 'id' in ticket_data:
+                write_ticket_file(ticket_data)
+                active_files_written_count +=1
+    log_message(f"Wrote/updated {active_files_written_count} ticket files for types {TYPES_TO_INCLUDE} in '{TICKETS_DIR}'.")
 
-        active_files_written_count = 0
-        if processed_ticket_data_list:
-            for ticket_data in processed_ticket_data_list: # Iterate through the already filtered list
-                # The check `ticket_data.get('type') in TYPES_TO_INCLUDE` is redundant here as it's already filtered
-                if isinstance(ticket_data, dict) and 'id' in ticket_data:
-                    write_ticket_file(ticket_data)
-                    active_files_written_count +=1
-        log_message(f"Wrote/updated {active_files_written_count} ticket files for types {TYPES_TO_INCLUDE} in '{TICKETS_DIR}'.")
+    closed_or_missing_ids = local_ticket_ids_before_processing - api_ticket_ids_for_saving
+    num_tickets_archived_this_cycle = 0
+    if closed_or_missing_ids:
+        log_message(f"Found {len(closed_or_missing_ids)} local files to archive: {closed_or_missing_ids}")
+        for ticket_id_to_archive in closed_or_missing_ids:
+            archive_ticket_file(ticket_id_to_archive)
+            num_tickets_archived_this_cycle += 1
+    else:
+        log_message("No local ticket files to archive in this cycle.")
 
-        # Files to archive are those present locally but NOT in the current list of active tickets (of specified types) from API
-        closed_or_missing_ids = local_ticket_ids_before_processing - api_ticket_ids_for_saving
-        num_tickets_archived_this_cycle = 0
-        if closed_or_missing_ids:
-            log_message(f"Found {len(closed_or_missing_ids)} local files to archive (no longer active or not of specified types): {closed_or_missing_ids}")
-            for ticket_id_to_archive in closed_or_missing_ids:
-                archive_ticket_file(ticket_id_to_archive)
-                num_tickets_archived_this_cycle += 1
-        else:
-            log_message("No local ticket files to archive in this cycle.")
+    newly_added_ids = api_ticket_ids_for_saving - local_ticket_ids_before_processing
+    log_message(f"Changes: {len(newly_added_ids)} new tickets processed, {num_tickets_archived_this_cycle} old files archived.")
 
-        newly_added_ids = api_ticket_ids_for_saving - local_ticket_ids_before_processing
-        log_message(f"Changes: {len(newly_added_ids)} new tickets processed, {num_tickets_archived_this_cycle} old/non-specified-type files archived.")
-
-        cycle_duration = time.time() - current_cycle_start_time
-        log_message(f"--- Poll cycle finished in {cycle_duration:.2f} seconds. ---")
-
-        sleep_duration = max(0, POLL_INTERVAL - cycle_duration)
-        if sleep_duration > 0:
-            log_message(f"Sleeping for {sleep_duration:.2f} seconds...")
-            time.sleep(sleep_duration)
-        else:
-            log_message(f"Warning: Poll cycle took longer than POLL_INTERVAL ({POLL_INTERVAL}s). Running next cycle immediately.", is_error=True)
+    cycle_duration = time.time() - current_cycle_start_time
+    log_message(f"--- Watcher cycle finished in {cycle_duration:.2f} seconds. ---")
 
 if __name__ == '__main__':
     try:
-        main_loop()
+        # Moved setup functions here to catch startup errors properly
+        ensure_directories()
+        run_watcher_once()
+    except (FileNotFoundError, ValueError, IOError) as e:
+        # Catches specific, critical startup errors from read_api_key()
+        log_message(f"CRITICAL STARTUP ERROR: {e}", is_error=True)
+        sys.exit(1) # Exit with an error code
     except KeyboardInterrupt:
-        log_message("Poller interrupted by user (Ctrl+C). Exiting gracefully.")
+        log_message("\nWatcher script interrupted by user (Ctrl+C). Exiting gracefully.")
+        # The script will exit naturally after this block
     except Exception as e:
-        log_message(f"Unhandled exception in main_loop: {e}", is_error=True)
+        log_message(f"An unexpected error occurred: {e}", is_error=True)
         import traceback
         log_message(traceback.format_exc(), is_error=True)
+        sys.exit(1)

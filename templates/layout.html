@@ -40,6 +40,10 @@
             </li>
         </ul>
         <div class="sidebar-footer">
+            <a href="{{ url_for('settings') }}">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </a>
             <div class="theme-switch-wrapper">
                 <label class="theme-switch" for="checkbox">
                     <input type="checkbox" id="checkbox" />
@@ -50,6 +54,7 @@
     </div>
 
     <div class="main-content">
+        {% block main_header %}
         <header class="main-header">
             <div class="header-left">
                 <h1>{{ page_title_display }}</h1>
@@ -69,6 +74,7 @@
                 </div>
             </div>
         </header>
+        {% endblock main_header %}
 
         <main class="content-area">
             {% block content %}{% endblock %}

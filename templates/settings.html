@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block head %}
+    {# The link to settings.css has been removed #}
+{% endblock %}
+
+{% block main_header %}
+    {# This block is intentionally left empty to remove the header on this page. #}
+{% endblock main_header %}
+
+{% block content %}
+<div class="settings-container">
+    <h1>Application Settings</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'error' }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="settings-section">
+        <h2>Ticket Watcher Scheduler</h2>
+        <p>
+            <strong>Status:</strong>
+            <span id="scheduler-status" class="status-{{ 'running' if scheduler_status == 'Running' else 'stopped' }}">
+                {{ scheduler_status }}
+            </span>
+        </p>
+        <p>Control the background process that fetches new and updated tickets from Freshservice.</p>
+
+        <form action="{{ url_for('settings') }}" method="post">
+            <div class="form-group">
+                <label for="interval">Polling Interval (seconds)</label>
+                <input type="number" id="interval" name="interval" value="{{ poll_interval }}" min="30">
+            </div>
+
+            <div class="button-group">
+                <button type="submit" name="action" value="update_interval" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Update Interval
+                </button>
+                <button type="submit" name="action" value="start" class="btn btn-success" {% if scheduler_status == 'Running' %}disabled{% endif %}>
+                    <i class="fas fa-play"></i> Start Watcher
+                </button>
+                <button type="submit" name="action" value="stop" class="btn btn-danger" {% if scheduler_status == 'Stopped' %}disabled{% endif %}>
+                    <i class="fas fa-stop"></i> Stop Watcher
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
